@@ -5,7 +5,7 @@ const io = require('socket.io')(http);
 const path = require('path');
 
 // Servir archivos estáticos
-app.use(express.static('public'));
+app.use(express.static(__dirname));
 
 // Lógica de salas
 const rooms = {};
