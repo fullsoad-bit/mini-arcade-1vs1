@@ -4,10 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MINI 1vs1 | Arcade LAN</title>
-    <!-- Fuentes: Press Start para estilo y Roboto para legibilidad -->
+    
+    <!-- Google Fonts corregido -->
     <link href="https://googleapis.com" rel="stylesheet">
+    
     <!-- Librería Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
+
+    <!-- 🟢 MODIFICACIÓN: CARGA DE SCRIPTS DE LOS JUEGOS -->
+    <!-- Estos scripts deben existir en tu carpeta public/js/ -->
+    <script src="/js/pingpong.js"></script>
+    <script src="/js/carrera.js"></script>
+    <script src="/js/tetrix.js"></script>
+    <script src="/js/tiro.js"></script>
     
     <style>
         :root {
@@ -31,11 +40,9 @@
             overflow-x: hidden;
         }
 
-        /* Capas de visualización */
         #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; }
         #game-container { display: none; width: 100%; text-align: center; margin-top: 20px; }
 
-        /* Efecto Monitor Antiguo */
         body::before {
             content: " ";
             display: block;
@@ -76,7 +83,6 @@
             box-shadow: 0 0 20px var(--neon-green);
         }
 
-        /* Modal */
         #room-modal {
             display: none;
             position: fixed;
@@ -115,14 +121,13 @@
             font-size: 0.7rem;
         }
 
-        .ad-space { width: 728px; height: 90px; background: #111; margin: 20px 0; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; border: 1px dashed #555; color: #444; }
+        .ad-space { width: 100%; max-width: 728px; height: 90px; background: #111; margin: 20px 0; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; border: 1px dashed #555; color: #444; }
     </style>
 </head>
 <body>
 
     <div id="ui-layer">
         <div class="ad-space">MODO LAN ACTIVO</div>
-
         <h1>MINI 1vs1</h1>
         <p style="font-family: var(--text-retro); font-size: 0.7rem;">ELIGE TU DESAFÍO EN RED</p>
 
@@ -153,8 +158,6 @@
     </div>
 
     <script>
-        // MODIFICACIÓN LAN: Detecta automáticamente la URL del servidor
-        // Esto permite que móviles y otras PCs se conecten sin configurar nada
         const socket = (typeof io !== 'undefined') ? io(window.location.origin) : null; 
         
         let soyAnfitrion = false;
@@ -176,24 +179,26 @@
         function generateRoom() {
             const pass = document.getElementById('room-pass').value || "123";
             const game = title.innerText;
+            soyAnfitrion = true; 
             if(socket) socket.emit('create_room', { password: pass, game: game });
         }
 
         function joinRoom() {
             const id = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
+            soyAnfitrion = false; 
             if(socket) socket.emit('join_room', { roomId: id, password: pass });
         }
 
         if(socket) {
             socket.on('room_created', (data) => {
-                soyAnfitrion = true; 
                 idSalaActual = data.roomId;
                 document.getElementById('room-info').innerHTML = 
                     `SALA: ${data.roomId}<br>PASS: ${data.password}<br>ESPERANDO RIVAL...`;
             });
 
             socket.on('player_joined', (data) => {
+                console.log("¡Jugador detectado! Iniciando juego...", data);
                 idSalaActual = data.roomId || idSalaActual;
                 closeModal();
                 iniciarJuego(data.game);
@@ -206,10 +211,21 @@
             uiLayer.style.display = "none";
             gameContainer.style.display = "block";
             
+            console.log("Intentando ejecutar función para:", nombre);
+
             if(nombre === "PING PONG") {
-                if(typeof startPingPong === 'function') startPingPong(idSalaActual, soyAnfitrion);
+                if(typeof startPingPong === 'function') {
+                    startPingPong(idSalaActual, soyAnfitrion);
+                } else {
+                    console.error("Error: startPingPong no está definida.");
+                }
             } else if(nombre === "CARRERA 2D") {
-                if(typeof startRacing === 'function') startRacing(idSalaActual, soyAnfitrion);
+                if(typeof startRacing === 'function') {
+                    startRacing(idSalaActual, soyAnfitrion);
+                } else {
+                    // Si tu función en carrera.js se llama distinto, ajústalo aquí
+                    console.error("Error: startRacing no está definida.");
+                }
             } else if(nombre === "TETRIX (3 MIN)") {
                 if(typeof startTetrix === 'function') startTetrix(idSalaActual, soyAnfitrion);
             } else if(nombre === "TIRO AL BLANCO") {
@@ -217,16 +233,5 @@
             }
         }
     </script>
-
-    <script src="js/pingpong.js"></script>
-    <script src="js/carrera.js"></script>
-    <script src="js/tetrix.js"></script>
-    <script src="js/tiro.js"></script>
-    <footer style="margin: 40px 0; text-align: center; z-index: 10;">
-    <p style="font-size: 0.7rem; color: #555;">© 2024 DEXTER - Pablo Ezequiel Rodriguez Cardozo</p>
-    <a href="legal.html" style="color: var(--neon-green); text-decoration: none; font-size: 0.7rem; font-family: var(--text-retro);">[ PRIVACIDAD Y TÉRMINOS ]</a>
-</footer>
-
 </body>
 </html>
-
