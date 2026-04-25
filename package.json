@@ -1,12 +1,26 @@
 {
-  "name": "mini-1vs1-arcade",
+  "name": "mini-arcade-1vs1",
   "version": "1.0.0",
+  "description": "Plataforma de mini juegos arcade 1vs1 con Socket.io",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [
+    "arcade",
+    "multiplayer",
+    "socketio",
+    "javascript",
+    "games"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
