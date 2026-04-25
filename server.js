@@ -4,8 +4,14 @@ const http = require('http').Server(app);
 const io = require('socket.io')(http);
 const path = require('path');
 
-// Servir archivos estáticos
+// --- CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS ---
+
+// 1. Sirve el index.html y archivos en la raíz
 app.use(express.static(__dirname));
+
+// 2. Sirve los scripts de juegos desde la carpeta public/js
+// Esto corrige el error 404 y el error de MIME type (text/html)
+app.use('/js', express.static(path.join(__dirname, 'public/js')));
 
 // Lógica de salas
 const rooms = {};
@@ -14,7 +20,6 @@ io.on('connection', (socket) => {
     console.log('Usuario conectado:', socket.id);
 
     socket.on('create_room', (data) => {
-        // Generar ID de sala de 4 dígitos
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
         
         rooms[roomId] = {
@@ -33,21 +38,19 @@ io.on('connection', (socket) => {
         
         if (room && room.password === data.password) {
             if (room.players.length < 2) {
-                // Asegurar que no se duplique el ID si reconecta rápido
                 if (!room.players.includes(socket.id)) {
                     room.players.push(socket.id);
                 }
                 
                 socket.join(data.roomId);
                 
-                // 🔥 SOLUCIÓN: Emitir a TODOS en la sala incluyendo al que entra
-                // Usamos un pequeño delay para asegurar que el join se completó
+                // Delay de seguridad para asegurar que el socket está en la sala
                 setTimeout(() => {
                     io.to(data.roomId).emit('player_joined', { 
                         roomId: data.roomId, 
                         game: room.game 
                     });
-                }, 100);
+                }, 200);
                 
                 console.log(`Jugador unido a ${data.roomId}. Iniciando: ${room.game}`);
             } else {
@@ -60,7 +63,6 @@ io.on('connection', (socket) => {
 
     // --- SINCRONIZACIÓN DE JUEGO ---
     socket.on('player_move', (data) => {
-        // Usar to() asegura que se envíe a todos los demás en la sala
         socket.to(data.roomId).emit('opponent_move', data);
     });
 
@@ -74,18 +76,14 @@ io.on('connection', (socket) => {
 
     // --- LIMPIEZA SEGURA AL DESCONECTAR ---
     socket.on('disconnecting', () => {
-        // Iteramos sobre las salas del socket (excepto la sala personal del socket.id)
         for (const room of socket.rooms) {
             if (rooms[room]) {
-                // Quitamos al jugador de la lista
                 rooms[room].players = rooms[room].players.filter(id => id !== socket.id);
                 
-                // Solo borramos la sala si queda totalmente vacía
                 if (rooms[room].players.length === 0) {
                     delete rooms[room];
                     console.log(`Sala ${room} eliminada por estar vacía.`);
                 } else {
-                    // Si queda alguien, avisamos que el oponente se fue
                     socket.to(room).emit('error_msg', 'El oponente se ha desconectado');
                 }
             }
@@ -100,7 +98,10 @@ io.on('connection', (socket) => {
 // --- CONFIGURACIÓN PARA RENDER ---
 const PORT = process.env.PORT || 3000;
 
-// Escuchar en 0.0.0.0 es clave para Render
-server = http.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor Arcade Online en puerto: ${PORT}`);
+http.listen(PORT, '0.0.0.0', () => {
+    console.log('-----------------------------------------');
+    console.log(`🚀 SERVIDOR ARCADE ONLINE ACTIVO`);
+    console.log(`Puerto: ${PORT}`);
+    console.log('-----------------------------------------');
 });
+
