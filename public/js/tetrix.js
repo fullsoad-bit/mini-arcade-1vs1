@@ -1,12 +1,11 @@
-// js/tetrix.js
-
 const canvasT = document.createElement('canvas');
 const ctxT = canvasT.getContext('2d');
 canvasT.width = 300;
 canvasT.height = 600;
-canvasT.style.border = "4px solid #FF00FF"; // Rosa neón
+canvasT.style.border = "4px solid #FF00FF";
 canvasT.style.display = "block";
 canvasT.style.margin = "10px auto";
+canvasT.style.boxShadow = "0 0 20px rgba(255, 0, 255, 0.5)";
 
 const ROW = 20;
 const COL = 10;
@@ -19,14 +18,22 @@ let isTetrixActive = false;
 
 let myScore = 0;
 let opponentScore = 0;
-let tetrixTimeLeft = 180; // 3 minutos
-let tetrixGameInterval;
-let tetrixTimerInterval;
+let tetrixTimeLeft = 180;
+let tetrixGameInterval, tetrixTimerInterval;
 
-// Tablero local
 let board = [];
-for (let r = 0; r < ROW; r++) {
-    board[r] = Array(COL).fill(VACANTE);
+function initBoard() {
+    board = [];
+    for (let r = 0; r < ROW; r++) {
+        board[r] = Array(COL).fill(VACANTE);
+    }
+}
+
+function drawSquare(x, y, color) {
+    ctxT.fillStyle = color;
+    ctxT.fillRect(x * SQ, y * SQ, SQ, SQ);
+    ctxT.strokeStyle = "rgba(255,255,255,0.1)";
+    ctxT.strokeRect(x * SQ, y * SQ, SQ, SQ);
 }
 
 function drawBoard() {
@@ -35,13 +42,6 @@ function drawBoard() {
             drawSquare(c, r, board[r][c]);
         }
     }
-}
-
-function drawSquare(x, y, color) {
-    ctxT.fillStyle = color;
-    ctxT.fillRect(x * SQ, y * SQ, SQ, SQ);
-    ctxT.strokeStyle = "#111";
-    ctxT.strokeRect(x * SQ, y * SQ, SQ, SQ);
 }
 
 const PIECES = [
@@ -62,13 +62,13 @@ function randomPiece() {
 let piece = randomPiece();
 
 function moveDown() {
+    if (!isTetrixActive) return;
     if (!collision(0, 1, piece.shape)) {
         piece.y++;
     } else {
         lockPiece();
         piece = randomPiece();
     }
-    renderTetrix();
 }
 
 function collision(dx, dy, shape) {
@@ -90,10 +90,9 @@ function lockPiece() {
         for (let c = 0; c < piece.shape[r].length; c++) {
             if (!piece.shape[r][c]) continue;
             if (piece.y + r < 0) {
-                // Si se llena el tablero, penalización de puntos pero sigue jugando
-                myScore = Math.max(0, myScore - 500);
-                resetBoard();
-                syncScore();
+                myScore = Math.max(0, myScore - 200);
+                initBoard();
+                syncTetrix();
                 return;
             }
             board[piece.y + r][piece.x + c] = piece.color;
@@ -103,27 +102,23 @@ function lockPiece() {
 }
 
 function checkLines() {
-    let linesCleared = 0;
+    let lines = 0;
     for (let r = 0; r < ROW; r++) {
         if (board[r].every(cell => cell !== VACANTE)) {
             board.splice(r, 1);
             board.unshift(Array(COL).fill(VACANTE));
-            linesCleared++;
+            lines++;
         }
     }
-    if (linesCleared > 0) {
-        myScore += linesCleared * 100 * linesCleared;
-        syncScore();
+    if (lines > 0) {
+        myScore += [0, 100, 300, 500, 800][lines] || 1000;
+        syncTetrix();
     }
 }
 
-function resetBoard() {
-    for (let r = 0; r < ROW; r++) board[r].fill(VACANTE);
-}
-
-function syncScore() {
+function syncTetrix() {
     if (tetrixRoomId && typeof socket !== 'undefined') {
-        socket.emit('player_move', { 
+        socket.emit('tetrix_sync', { 
             roomId: tetrixRoomId, 
             score: myScore, 
             role: tetrixRole 
@@ -133,34 +128,40 @@ function syncScore() {
 
 function renderTetrix() {
     if (!isTetrixActive) return;
+    
+    // Limpiar fondo
+    ctxT.fillStyle = VACANTE;
+    ctxT.fillRect(0, 0, canvasT.width, canvasT.height);
+    
     drawBoard();
     
-    // Dibujar pieza actual
+    // Dibujar pieza activa
     for (let r = 0; r < piece.shape.length; r++) {
         for (let c = 0; c < piece.shape[r].length; c++) {
             if (piece.shape[r][c]) drawSquare(piece.x + c, piece.y + r, piece.color);
         }
     }
 
-    // HUD Neón
-    ctxT.fillStyle = "rgba(0,0,0,0.7)";
-    ctxT.fillRect(0, 0, 300, 80);
+    // HUD
+    ctxT.fillStyle = "rgba(0,0,0,0.85)";
+    ctxT.fillRect(0, 0, canvasT.width, 90);
     
     ctxT.font = "10px 'Press Start 2P'";
-    ctxT.fillStyle = "#FFF";
-    ctxT.fillText(`TIEMPO: ${tetrixTimeLeft}s`, 15, 25);
+    ctxT.fillStyle = "#00F3FF";
+    ctxT.fillText(`TIME: ${tetrixTimeLeft}s`, 20, 30);
     
-    ctxT.fillStyle = "#39FF14"; // Verde (Tú)
-    ctxT.fillText(`TU: ${myScore}`, 15, 50);
+    ctxT.fillStyle = "#39FF14";
+    ctxT.fillText(`YOU: ${myScore}`, 20, 55);
     
-    ctxT.fillStyle = "#FF00FF"; // Rosa (Rival)
-    ctxT.fillText(`RIVAL: ${opponentScore}`, 15, 70);
+    ctxT.fillStyle = "#FF00FF";
+    ctxT.fillText(`RIVAL: ${opponentScore}`, 20, 75);
+
+    requestAnimationFrame(renderTetrix);
 }
 
-// Eventos de Red
+// Red
 if (typeof socket !== 'undefined') {
-    socket.on('opponent_move', (data) => {
-        // En Tetris solo nos interesa sincronizar el puntaje del otro
+    socket.on('tetrix_update', (data) => {
         opponentScore = data.score;
     });
 }
@@ -175,7 +176,6 @@ window.addEventListener("keydown", (e) => {
         let next = piece.shape[0].map((_, i) => piece.shape.map(row => row[i]).reverse());
         if (!collision(0, 0, next)) piece.shape = next;
     }
-    renderTetrix();
 });
 
 function endTetrix() {
@@ -183,29 +183,29 @@ function endTetrix() {
     clearInterval(tetrixGameInterval);
     clearInterval(tetrixTimerInterval);
     
-    let result = "";
-    if (myScore > opponentScore) result = "¡VICTORIA MAGISTRAL!";
-    else if (myScore < opponentScore) result = "DERROTA... MÁS PRÁCTICA";
-    else result = "¡EMPATE DE LEYENDAS!";
-
-    alert(`FIN DEL TIEMPO\nTu puntaje: ${myScore}\nRival: ${opponentScore}\n\n${result}`);
-    location.reload();
+    let result = myScore > opponentScore ? "¡VICTORIA!" : (myScore < opponentScore ? "DERROTA" : "EMPATE");
+    alert(`FIN DEL TIEMPO\n${result}\nTu Score: ${myScore}\nRival: ${opponentScore}`);
+    window.location.reload();
 }
 
 function startTetrix(roomId, isHost) {
     tetrixRoomId = roomId;
     tetrixRole = isHost ? 'host' : 'guest';
     isTetrixActive = true;
+    initBoard();
+    myScore = 0;
+    opponentScore = 0;
+    tetrixTimeLeft = 180;
 
-    // Inyectar en index.html
     const container = document.getElementById('game-container');
     container.innerHTML = ""; 
     container.appendChild(canvasT);
 
-    tetrixGameInterval = setInterval(moveDown, 500);
+    tetrixGameInterval = setInterval(moveDown, 600);
     tetrixTimerInterval = setInterval(() => {
         if (tetrixTimeLeft > 0) tetrixTimeLeft--;
         else endTetrix();
-        renderTetrix();
     }, 1000);
+
+    renderTetrix();
 }
