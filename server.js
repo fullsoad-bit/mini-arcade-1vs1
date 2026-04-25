@@ -30,14 +30,26 @@ io.on('connection', (socket) => {
 
     socket.on('join_room', (data) => {
         const room = rooms[data.roomId];
+        
         if (room && room.password === data.password) {
             if (room.players.length < 2) {
-                room.players.push(socket.id);
+                // Asegurar que no se duplique el ID si reconecta rápido
+                if (!room.players.includes(socket.id)) {
+                    room.players.push(socket.id);
+                }
+                
                 socket.join(data.roomId);
-                io.to(data.roomId).emit('player_joined', { 
-                    roomId: data.roomId, 
-                    game: room.game 
-                });
+                
+                // 🔥 SOLUCIÓN: Emitir a TODOS en la sala incluyendo al que entra
+                // Usamos un pequeño delay para asegurar que el join se completó
+                setTimeout(() => {
+                    io.to(data.roomId).emit('player_joined', { 
+                        roomId: data.roomId, 
+                        game: room.game 
+                    });
+                }, 100);
+                
+                console.log(`Jugador unido a ${data.roomId}. Iniciando: ${room.game}`);
             } else {
                 socket.emit('error_msg', 'La sala está llena');
             }
@@ -47,8 +59,8 @@ io.on('connection', (socket) => {
     });
 
     // --- SINCRONIZACIÓN DE JUEGO ---
-
     socket.on('player_move', (data) => {
+        // Usar to() asegura que se envíe a todos los demás en la sala
         socket.to(data.roomId).emit('opponent_move', data);
     });
 
@@ -60,15 +72,24 @@ io.on('connection', (socket) => {
         socket.to(data.roomId).emit('opponent_stunned', data);
     });
 
-    // --- LIMPIEZA AL DESCONECTAR ---
+    // --- LIMPIEZA SEGURA AL DESCONECTAR ---
     socket.on('disconnecting', () => {
-        // Al desconectarse, eliminamos la sala para liberar memoria en Render
-        socket.rooms.forEach(roomId => {
-            if (rooms[roomId]) {
-                delete rooms[roomId];
-                console.log(`Sala ${roomId} eliminada por desconexión.`);
+        // Iteramos sobre las salas del socket (excepto la sala personal del socket.id)
+        for (const room of socket.rooms) {
+            if (rooms[room]) {
+                // Quitamos al jugador de la lista
+                rooms[room].players = rooms[room].players.filter(id => id !== socket.id);
+                
+                // Solo borramos la sala si queda totalmente vacía
+                if (rooms[room].players.length === 0) {
+                    delete rooms[room];
+                    console.log(`Sala ${room} eliminada por estar vacía.`);
+                } else {
+                    // Si queda alguien, avisamos que el oponente se fue
+                    socket.to(room).emit('error_msg', 'El oponente se ha desconectado');
+                }
             }
-        });
+        }
     });
 
     socket.on('disconnect', () => {
@@ -76,13 +97,10 @@ io.on('connection', (socket) => {
     });
 });
 
-// --- CONFIGURACIÓN PARA RENDER Y CLOUD ---
-// process.env.PORT es OBLIGATORIO para que Render detecte tu app
+// --- CONFIGURACIÓN PARA RENDER ---
 const PORT = process.env.PORT || 3000;
 
-http.listen(PORT, '0.0.0.0', () => {
-    console.log('-----------------------------------------');
-    console.log(`🚀 SERVIDOR ARCADE ONLINE ACTIVO`);
-    console.log(`Puerto asignado: ${PORT}`);
-    console.log('-----------------------------------------');
+// Escuchar en 0.0.0.0 es clave para Render
+server = http.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor Arcade Online en puerto: ${PORT}`);
 });
