@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MINI 1vs1 | Arcade LAN</title>
     
-    <!-- Google Fonts corregido -->
+    <!-- Google Fonts -->
     <link href="https://googleapis.com" rel="stylesheet">
     
-    <!-- Librería Socket.io -->
+    <!-- Librería Socket.io (OBLIGATORIA) -->
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- 🟢 MODIFICACIÓN: CARGA DE SCRIPTS DE LOS JUEGOS -->
-    <!-- Estos scripts deben existir en tu carpeta public/js/ -->
+    <!-- Scripts de Juegos (Rutas corregidas para el servidor) -->
     <script src="/js/pingpong.js"></script>
     <script src="/js/carrera.js"></script>
     <script src="/js/tetrix.js"></script>
@@ -40,9 +39,11 @@
             overflow-x: hidden;
         }
 
+        /* Capas de visualización */
         #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; }
         #game-container { display: none; width: 100%; text-align: center; margin-top: 20px; }
 
+        /* Efecto Monitor CRT */
         body::before {
             content: " ";
             display: block;
@@ -55,7 +56,7 @@
             pointer-events: none;
         }
 
-        h1 { font-family: var(--text-retro); font-size: 2.5rem; color: var(--neon-pink); margin-top: 50px; text-align: center; }
+        h1 { font-family: var(--text-retro); font-size: 2.2rem; color: var(--neon-pink); margin-top: 50px; text-align: center; }
 
         .game-grid {
             display: grid;
@@ -83,6 +84,7 @@
             box-shadow: 0 0 20px var(--neon-green);
         }
 
+        /* Modal */
         #room-modal {
             display: none;
             position: fixed;
@@ -96,18 +98,14 @@
             box-shadow: 0 0 50px rgba(255, 0, 255, 0.3);
         }
 
-        #room-modal h2 { font-family: var(--text-retro); font-size: 1rem; }
-
         input {
             background: #000;
             border: 2px solid var(--neon-green);
             color: var(--neon-green);
             padding: 10px;
             font-family: var(--text-readable); 
-            font-weight: bold;
             margin: 10px 0;
             width: 80%;
-            font-size: 0.9rem;
             text-align: center;
         }
 
@@ -121,31 +119,36 @@
             font-size: 0.7rem;
         }
 
-        .ad-space { width: 100%; max-width: 728px; height: 90px; background: #111; margin: 20px 0; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; border: 1px dashed #555; color: #444; }
+        .ad-space { width: 100%; max-width: 728px; height: 90px; background: #111; margin: 20px 0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border: 1px dashed #555; color: #444; }
     </style>
 </head>
 <body>
 
     <div id="ui-layer">
-        <div class="ad-space">MODO LAN ACTIVO</div>
+        <div class="ad-space">MODO ONLINE ACTIVO</div>
+
         <h1>MINI 1vs1</h1>
         <p style="font-family: var(--text-retro); font-size: 0.7rem;">ELIGE TU DESAFÍO EN RED</p>
 
         <div class="game-grid">
             <div class="game-card" onclick="openModal('PING PONG')">PING PONG</div>
             <div class="game-card" onclick="openModal('CARRERA 2D')">CARRERA 2D</div>
-            <div class="game-card" onclick="openModal('TETRIX (3 MIN)')">TETRIX (3 MIN)</div>
+            <div class="game-card" onclick="openModal('TETRIX')">TETRIX (3 MIN)</div>
             <div class="game-card" onclick="openModal('TIRO AL BLANCO')">TIRO AL BLANCO</div>
         </div>
     </div>
 
+    <!-- Contenedor donde se inyectará el canvas de cada juego -->
     <div id="game-container"></div>
 
+    <!-- Modal de Salas -->
     <div id="room-modal">
-        <h2 id="selected-game-title">JUEGO</h2>
+        <h2 id="selected-game-title" style="font-family: var(--text-retro); font-size: 1rem;">JUEGO</h2>
         <p style="font-size: 0.8rem; font-weight: bold;">CREAR NUEVA PARTIDA</p>
         <button class="btn" onclick="generateRoom()">GENERAR SALA</button>
+        
         <div id="room-info" style="margin-top: 15px; color: var(--neon-pink); font-size: 0.8rem; font-weight: bold;"></div>
+        
         <hr style="border: 1px solid #333; margin: 20px 0;">
         <p style="font-size: 0.8rem; font-weight: bold;">UNIRSE A SALA</p>
         
@@ -158,6 +161,7 @@
     </div>
 
     <script>
+        // Conexión automática al origen de la ventana (Render/Local)
         const socket = (typeof io !== 'undefined') ? io(window.location.origin) : null; 
         
         let soyAnfitrion = false;
@@ -179,15 +183,19 @@
         function generateRoom() {
             const pass = document.getElementById('room-pass').value || "123";
             const game = title.innerText;
-            soyAnfitrion = true; 
-            if(socket) socket.emit('create_room', { password: pass, game: game });
+            if(socket) {
+                soyAnfitrion = true;
+                socket.emit('create_room', { password: pass, game: game });
+            }
         }
 
         function joinRoom() {
             const id = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
-            soyAnfitrion = false; 
-            if(socket) socket.emit('join_room', { roomId: id, password: pass });
+            if(socket) {
+                soyAnfitrion = false;
+                socket.emit('join_room', { roomId: id, password: pass });
+            }
         }
 
         if(socket) {
@@ -198,7 +206,7 @@
             });
 
             socket.on('player_joined', (data) => {
-                console.log("¡Jugador detectado! Iniciando juego...", data);
+                console.log("¡Jugador detectado! Iniciando:", data.game);
                 idSalaActual = data.roomId || idSalaActual;
                 closeModal();
                 iniciarJuego(data.game);
@@ -211,24 +219,17 @@
             uiLayer.style.display = "none";
             gameContainer.style.display = "block";
             
-            console.log("Intentando ejecutar función para:", nombre);
-
+            // Llamar a las funciones según el nombre devuelto por el servidor
             if(nombre === "PING PONG") {
-                if(typeof startPingPong === 'function') {
-                    startPingPong(idSalaActual, soyAnfitrion);
-                } else {
-                    console.error("Error: startPingPong no está definida.");
-                }
-            } else if(nombre === "CARRERA 2D") {
-                if(typeof startRacing === 'function') {
-                    startRacing(idSalaActual, soyAnfitrion);
-                } else {
-                    // Si tu función en carrera.js se llama distinto, ajústalo aquí
-                    console.error("Error: startRacing no está definida.");
-                }
-            } else if(nombre === "TETRIX (3 MIN)") {
+                if(typeof startPingPong === 'function') startPingPong(idSalaActual, soyAnfitrion);
+            } 
+            else if(nombre === "CARRERA 2D") {
+                if(typeof startRacing === 'function') startRacing(idSalaActual, soyAnfitrion);
+            } 
+            else if(nombre === "TETRIX") {
                 if(typeof startTetrix === 'function') startTetrix(idSalaActual, soyAnfitrion);
-            } else if(nombre === "TIRO AL BLANCO") {
+            } 
+            else if(nombre === "TIRO AL BLANCO") {
                 if(typeof startTiro === 'function') startTiro(idSalaActual, soyAnfitrion);
             }
         }
