@@ -1,40 +1,147 @@
-// Usamos una variable para no duplicar el canvas si se reinicia
-let canvas = document.querySelector('#game-canvas');
-if (!canvas) {
-    canvas = document.createElement('canvas');
-    canvas.id = 'game-canvas';
-}
+const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 
-canvas.width = 600; 
+// Ajuste para móviles: Si es celular, lo hacemos un poco más estrecho
+const isMobileDevice = /Android|iPhone|iPad/i.test(navigator.userAgent);
+canvas.width = isMobileDevice ? 400 : 600; 
 canvas.height = 400;
-canvas.style.border = "4px solid #39FF14";
-canvas.style.display = "block"; 
-canvas.style.margin = "20px auto";
-canvas.style.backgroundColor = "black";
+
+canvas.style.cssText = "background:#000; border:4px solid #39FF14; display:block; margin:10px auto; max-width:95vw; height:auto; touch-action:none;";
 
 let currentRoomId = null;
 let role = "spectator"; 
+let isGameActive = false;
 
-const paddleWidth = 10, paddleHeight = 80;
+const paddleWidth = 12, paddleHeight = 80;
 let user = { x: 0, y: 160, score: 0 };
-let opponent = { x: 590, y: 160, score: 0 };
+let opponent = { x: canvas.width - 12, y: 160, score: 0 };
 
 const INITIAL_SPEED = 4;
-const SPEED_INCREMENT = 1.03; 
-let ball = { x: 300, y: 200, speedX: INITIAL_SPEED, speedY: INITIAL_SPEED, radius: 7 };
+let ball = { x: canvas.width / 2, y: 200, speedX: INITIAL_SPEED, speedY: INITIAL_SPEED, radius: 7 };
+
+function startPingPong(roomId, isHost) {
+    currentRoomId = roomId.toString();
+    role = isHost ? 'host' : 'guest';
+    isGameActive = true;
+
+    // Posiciones según rol
+    if (role === 'guest') { 
+        user.x = canvas.width - paddleWidth; 
+        opponent.x = 0; 
+    } else { 
+        user.x = 0; 
+        opponent.x = canvas.width - paddleWidth; 
+    }
+
+    const container = document.getElementById('game-container');
+    container.innerHTML = "";
+    
+    const title = document.createElement('h2');
+    title.style.cssText = "color:var(--neon-pink); font-family:'Press Start 2P'; font-size:12px; margin:10px;";
+    title.innerText = `MODO: ${role.toUpperCase()} | PRIMERO A 5`;
+    container.appendChild(title);
+    container.appendChild(canvas);
+
+    if (isMobileDevice) setupMobileControls(container);
+
+    // ESCUCHADOR DE RED ÚNICO (Canal sync)
+    socket.off('sync'); // Limpiar previos
+    socket.on('sync', (data) => {
+        if (!isGameActive) return;
+
+        // Recibir movimiento del rival
+        if (data.type === 'p_move') {
+            opponent.y = data.y;
+        }
+
+        // Recibir pelota y marcador (Solo el Guest recibe del Host)
+        if (data.type === 'ball_sync' && role === 'guest') {
+            ball.x = data.x;
+            ball.y = data.y;
+            // Invertimos la lógica del marcador para que el Guest vea su puntaje a la derecha
+            user.score = data.scoreGuest;
+            opponent.score = data.scoreHost;
+        }
+    });
+
+    gameLoop();
+}
+
+function movePaddle(dir) {
+    const speed = 30;
+    if (dir === "up" && user.y > 0) user.y -= speed;
+    if (dir === "down" && user.y < canvas.height - paddleHeight) user.y += speed;
+
+    socket.emit('sync', { roomId: currentRoomId, type: 'p_move', y: user.y });
+}
+
+// Control por Mouse (PC)
+canvas.addEventListener("mousemove", (evt) => {
+    if (!isGameActive) return;
+    let rect = canvas.getBoundingClientRect();
+    let mouseY = (evt.clientY - rect.top) * (canvas.height / rect.height);
+    user.y = mouseY - paddleHeight / 2;
+
+    if (user.y < 0) user.y = 0;
+    if (user.y > canvas.height - paddleHeight) user.y = canvas.height - paddleHeight;
+
+    socket.emit('sync', { roomId: currentRoomId, type: 'p_move', y: user.y });
+});
+
+function update() {
+    if (role === 'host') { 
+        ball.x += ball.speedX;
+        ball.y += ball.speedY;
+
+        // Rebote techo y suelo
+        if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+            ball.speedY = -ball.speedY;
+        }
+
+        // Colisión Paleta Izquierda (Host)
+        if (ball.x - ball.radius < user.x + paddleWidth && ball.y > user.y && ball.y < user.y + paddleHeight) {
+            ball.speedX = Math.abs(ball.speedX) * 1.05;
+        }
+
+        // Colisión Paleta Derecha (Guest)
+        if (ball.x + ball.radius > opponent.x && ball.y > opponent.y && ball.y < opponent.y + paddleHeight) {
+            ball.speedX = -Math.abs(ball.speedX) * 1.05;
+        }
+
+        // Goles
+        if (ball.x < 0) { opponent.score++; resetBall(); }
+        if (ball.x > canvas.width) { user.score++; resetBall(); }
+
+        // Enviar datos al Guest
+        socket.emit('sync', { 
+            roomId: currentRoomId, 
+            type: 'ball_sync',
+            x: ball.x, 
+            y: ball.y,
+            scoreHost: user.score,
+            scoreGuest: opponent.score
+        });
+
+        if (user.score >= 5 || opponent.score >= 5) endPingPong();
+    }
+}
+
+function resetBall() {
+    ball.x = canvas.width / 2;
+    ball.y = canvas.height / 2;
+    ball.speedX = (ball.speedX > 0 ? -INITIAL_SPEED : INITIAL_SPEED);
+}
 
 function render() {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Línea central
+    // Red
     ctx.strokeStyle = "#333";
-    ctx.setLineDash([5, 5]);
+    ctx.setLineDash([10, 10]);
     ctx.beginPath(); ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2, canvas.height); ctx.stroke();
-    ctx.setLineDash([]);
 
-    // Paletas (Verde para el jugador local, Rosa para el remoto)
+    // Paletas
     ctx.fillStyle = "#39FF14"; ctx.fillRect(user.x, user.y, paddleWidth, paddleHeight);
     ctx.fillStyle = "#FF00FF"; ctx.fillRect(opponent.x, opponent.y, paddleWidth, paddleHeight);
 
@@ -43,137 +150,36 @@ function render() {
     ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2); ctx.fill();
 
     // Marcador
-    ctx.font = "20px 'Press Start 2P'";
+    ctx.font = "20px Monospace";
     ctx.fillStyle = "#FFF";
-    if (role === 'host') {
-        ctx.fillText(user.score, 150, 50);
-        ctx.fillText(opponent.score, 450, 50);
-    } else {
-        ctx.fillText(opponent.score, 150, 50);
-        ctx.fillText(user.score, 450, 50);
-    }
-}
-
-// Escuchar movimiento del mouse
-canvas.addEventListener("mousemove", (evt) => {
-    let rect = canvas.getBoundingClientRect();
-    let root = document.documentElement;
-    let mouseY = evt.clientY - rect.top - root.scrollTop;
-    user.y = mouseY - paddleHeight / 2;
-
-    // Limitar paleta dentro del canvas
-    if (user.y < 0) user.y = 0;
-    if (user.y > canvas.height - paddleHeight) user.y = canvas.height - paddleHeight;
-
-    if (currentRoomId && socket) {
-        socket.emit('player_move', { roomId: currentRoomId, y: user.y });
-    }
-});
-
-// Escuchar actualizaciones del oponente
-if (typeof socket !== 'undefined') {
-    socket.on('opponent_move', (data) => { 
-        opponent.y = data.y; 
-    });
-
-    socket.on('ball_update', (data) => {
-        if (role === 'guest') {
-            ball.x = data.x;
-            ball.y = data.y;
-            user.score = data.scoreGuest;
-            opponent.score = data.scoreHost;
-            checkWinner();
-        }
-    });
-}
-
-function resetBall() {
-    ball.x = canvas.width / 2;
-    ball.y = canvas.height / 2;
-    ball.speedX = (ball.speedX > 0 ? -INITIAL_SPEED : INITIAL_SPEED);
-    ball.speedY = INITIAL_SPEED * (Math.random() > 0.5 ? 1 : -1);
-}
-
-function checkWinner() {
-    if (user.score >= 5 || opponent.score >= 5) {
-        let win = user.score >= 5;
-        alert(win ? "¡VICTORIA!" : "DERROTA");
-        window.location.reload();
-    }
-}
-
-function update() {
-    if (role === 'host') { 
-        ball.x += ball.speedX;
-        ball.y += ball.speedY;
-
-        // Rebote paredes superior/inferior
-        if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
-            ball.speedY = -ball.speedY;
-        }
-
-        // Colisión Paleta Izquierda (Host)
-        if (ball.x - ball.radius < user.x + paddleWidth && ball.y > user.y && ball.y < user.y + paddleHeight) {
-            ball.speedX = Math.abs(ball.speedX) * SPEED_INCREMENT;
-            ball.speedY *= SPEED_INCREMENT;
-        }
-
-        // Colisión Paleta Derecha (Guest)
-        if (ball.x + ball.radius > opponent.x && ball.y > opponent.y && ball.y < opponent.y + paddleHeight) {
-            ball.speedX = -Math.abs(ball.speedX) * SPEED_INCREMENT;
-            ball.speedY *= SPEED_INCREMENT;
-        }
-
-        // Goles
-        if (ball.x < 0) { 
-            opponent.score++; 
-            resetBall(); 
-        }
-        if (ball.x > canvas.width) { 
-            user.score++; 
-            resetBall(); 
-        }
-
-        // Sincronizar con el Guest
-        socket.emit('ball_sync', { 
-            roomId: currentRoomId, 
-            x: ball.x, 
-            y: ball.y,
-            scoreHost: user.score,
-            scoreGuest: opponent.score
-        });
-        checkWinner();
-    }
+    ctx.fillText(user.score, (canvas.width / 2) - 50, 50);
+    ctx.fillText(opponent.score, (canvas.width / 2) + 30, 50);
 }
 
 function gameLoop() {
-    if (!currentRoomId) return;
+    if (!isGameActive) return;
     update();
     render();
     requestAnimationFrame(gameLoop);
 }
 
-function startPingPong(roomId, isHost) {
-    currentRoomId = roomId;
-    role = isHost ? 'host' : 'guest';
-    
-    // Configurar posiciones iniciales según rol
-    if (role === 'guest') { 
-        user.x = 590; 
-        opponent.x = 0; 
-    } else { 
-        user.x = 0; 
-        opponent.x = 590; 
-    }
+function endPingPong() {
+    isGameActive = false;
+    alert("PARTIDA TERMINADA");
+    window.location.reload();
+}
 
-    // Insertar el juego sin borrar todo el body para no perder el socket
-    const container = document.getElementById('game-container');
-    container.innerHTML = `
-        <h2 style="color:var(--neon-pink); font-family:'Press Start 2P'; font-size:12px; margin-top:20px;">
-            MODO: ${role.toUpperCase()} | PRIMERO A 5
-        </h2>
-    `;
-    container.appendChild(canvas);
+function setupMobileControls(cont) {
+    const box = document.createElement('div');
+    box.style.cssText = "display:flex; justify-content:space-around; width:100%; margin-top:15px;";
+    const btnS = "width:45%; height:80px; background:#333; border:2px solid #39FF14; color:white; font-size:30px; border-radius:12px; touch-action:none;";
     
-    gameLoop();
+    const bU = document.createElement('button'); bU.innerHTML = "🔼"; bU.style.cssText = btnS;
+    const bD = document.createElement('button'); bD.innerHTML = "🔽"; bD.style.cssText = btnS;
+
+    bU.ontouchstart = (e) => { e.preventDefault(); movePaddle("up"); };
+    bD.ontouchstart = (e) => { e.preventDefault(); movePaddle("down"); };
+
+    box.appendChild(bU); box.appendChild(bD);
+    cont.appendChild(box);
 }
