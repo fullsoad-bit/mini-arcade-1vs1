@@ -1,59 +1,55 @@
 const canvasRacing = document.createElement('canvas');
 const ctxRacing = canvasRacing.getContext('2d');
-
 canvasRacing.width = 400;
 canvasRacing.height = 600;
-canvasRacing.style.cssText = "background:#0d0208; border:4px solid #FF00FF; display:block; margin:10px auto; max-width:95vw; height:auto; touch-action:none;";
+canvasRacing.style.cssText = "background:#000; border:3px solid #FF00FF; display:block; margin:10px auto; max-width:95vw; height:auto; touch-action:none;";
 
 let racingRoomId = null;
 let racingRole = "spectator";
 let isRacingActive = false;
+let obstacles = [];
 
 let carHost = { x: 100, y: 480, color: "#39FF14", stun: 0, crashes: 0 };
 let carGuest = { x: 260, y: 480, color: "#FF00FF", stun: 0, crashes: 0 };
-let obstacles = [];
 let racingSpeed = 6;
 let timeLeft = 60;
-let timerInterval, obstacleInterval;
+let timerInt, obsInt;
 
 function startRacing(roomId, isHost) {
-    console.log("Juego activado en sala:", roomId);
-    racingRoomId = roomId;
+    if (!roomId) return alert("Error: Sala no encontrada");
+    
+    racingRoomId = roomId.toString();
     racingRole = isHost ? 'host' : 'guest';
     isRacingActive = true;
     obstacles = [];
     timeLeft = 60;
-    
-    // Resetear coches
-    carHost.crashes = 0; carGuest.crashes = 0;
-    carHost.stun = 0; carGuest.stun = 0;
 
     const container = document.getElementById('game-container');
     container.innerHTML = "";
     container.appendChild(canvasRacing);
 
-    // Controles para celulares Android
+    // Controles para Android/iOS
     if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-        setupMobileButtons(container);
+        setupMobileControls(container);
     }
 
-    if (timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
+    if (timerInt) clearInterval(timerInt);
+    timerInt = setInterval(() => {
         if (timeLeft > 0) timeLeft--;
         else endRacing();
     }, 1000);
 
     if (isHost) {
-        if (obstacleInterval) clearInterval(obstacleInterval);
-        obstacleInterval = setInterval(() => {
-            if(isRacingActive) obstacles.push({ x: Math.random() * 320 + 20, y: -50 });
-        }, 1000);
+        if (obsInt) clearInterval(obsInt);
+        obsInt = setInterval(() => {
+            if(isRacingActive) obstacles.push({ x: Math.random() * 310 + 25, y: -50 });
+        }, 900);
     }
 
     renderRacing();
 }
 
-// RECIBIR DATOS DEL RIVAL
+// ESCUCHADORES DE RED
 socket.on('opponent_move', (data) => {
     if (!isRacingActive) return;
     if (data.role === 'host') carHost.x = data.x;
@@ -62,17 +58,15 @@ socket.on('opponent_move', (data) => {
 
 socket.on('broadcast', (data) => {
     if (!isRacingActive) return;
-    
-    // Sincronizar obstáculos (Solo el Guest los recibe)
+    // Sincronizar obstáculos (Solo Guest)
     if (data.type === 'obs' && racingRole === 'guest') {
         obstacles = data.list;
     }
-    
-    // Sincronizar choques (Ambos se enteran)
+    // Sincronizar choques (Ambos)
     if (data.type === 'hit') {
-        const car = (data.role === 'host') ? carHost : carGuest;
-        car.stun = 40;
-        car.crashes = data.total;
+        const target = (data.role === 'host') ? carHost : carGuest;
+        target.stun = 40;
+        target.crashes = data.total;
     }
 });
 
@@ -91,16 +85,16 @@ function renderRacing() {
     if (!isRacingActive) return;
     ctxRacing.clearRect(0, 0, 400, 600);
 
-    // El Host mueve y transmite los obstáculos
+    // Host mueve y transmite
     if (racingRole === 'host') {
         obstacles.forEach(o => o.y += racingSpeed);
         obstacles = obstacles.filter(o => o.y < 650);
         socket.emit('broadcast', { roomId: racingRoomId, type: 'obs', list: obstacles });
     }
 
-    // Dibujar obstáculos y detectar choque propio
+    // Dibujar y detectar colisión propia
     obstacles.forEach(o => {
-        ctxRacing.fillStyle = "#FF3131";
+        ctxRacing.fillStyle = "#FF0000";
         ctxRacing.fillRect(o.x, o.y, 40, 40);
 
         let my = (racingRole === 'host') ? carHost : carGuest;
@@ -111,15 +105,15 @@ function renderRacing() {
         }
     });
 
-    // Dibujar Coches
     drawCar(carHost);
     drawCar(carGuest);
 
-    // Interfaz
+    // Texto UI
     ctxRacing.fillStyle = "white";
-    ctxRacing.font = "bold 14px Arial";
-    ctxRacing.fillText(`TIEMPO: ${timeLeft}s`, 10, 25);
-    ctxRacing.fillText(`YO: ${racingRole === 'host' ? carHost.crashes : carGuest.crashes} | RIVAL: ${racingRole === 'host' ? carGuest.crashes : carHost.crashes}`, 10, 50);
+    ctxRacing.font = "16px Arial";
+    ctxRacing.fillText(`⏱️ ${timeLeft}s`, 10, 25);
+    ctxRacing.fillText(`P1 Choques: ${carHost.crashes}`, 10, 50);
+    ctxRacing.fillText(`P2 Choques: ${carGuest.crashes}`, 10, 75);
 
     requestAnimationFrame(renderRacing);
 }
@@ -135,26 +129,25 @@ function drawCar(c) {
 
 function endRacing() {
     isRacingActive = false;
-    alert("JUEGO TERMINADO");
+    clearInterval(timerInt);
+    clearInterval(obsInt);
+    alert("CARRERA FINALIZADA");
     window.location.reload();
 }
 
-function setupMobileButtons(container) {
+function setupMobileControls(cont) {
     const box = document.createElement('div');
-    box.style.cssText = "display:flex; justify-content:space-around; padding:15px;";
+    box.style.cssText = "display:flex; justify-content:space-around; width:100%; margin-top:15px;";
+    const btnStyle = "width:45%; height:75px; background:#333; border:2px solid #39FF14; color:white; font-size:35px; border-radius:12px; touch-action:none;";
     
-    const btnL = document.createElement('button');
-    const btnR = document.createElement('button');
-    btnL.innerHTML = "◀️"; btnR.innerHTML = "▶️";
-    
-    const style = "width:45%; height:80px; font-size:40px; background:#FF00FF33; border:2px solid #FF00FF; color:white; border-radius:10px;";
-    btnL.style.cssText = style; btnR.style.cssText = style;
+    const bL = document.createElement('button'); bL.innerHTML = "◀️"; bL.style.cssText = btnStyle;
+    const bR = document.createElement('button'); bR.innerHTML = "▶️"; bR.style.cssText = btnStyle;
 
-    btnL.ontouchstart = (e) => { e.preventDefault(); movePlayer("left"); };
-    btnR.ontouchstart = (e) => { e.preventDefault(); movePlayer("right"); };
-    
-    box.appendChild(btnL); box.appendChild(btnR);
-    container.appendChild(box);
+    bL.ontouchstart = (e) => { e.preventDefault(); movePlayer("left"); };
+    bR.ontouchstart = (e) => { e.preventDefault(); movePlayer("right"); };
+
+    box.appendChild(bL); box.appendChild(bR);
+    cont.appendChild(box);
 }
 
 window.addEventListener("keydown", (e) => {
