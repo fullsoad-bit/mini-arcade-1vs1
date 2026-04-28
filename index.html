@@ -41,7 +41,7 @@
         #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; padding-bottom: 50px; }
         #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; position: relative; }
 
-        /* Efecto Monitor CRT */
+        /* Efecto Monitor CRT Scanlines */
         body::before {
             content: " ";
             display: block;
@@ -74,6 +74,7 @@
             background: rgba(57, 255, 20, 0.05);
             transition: 0.2s;
             font-size: 0.6rem;
+            line-height: 1.4;
         }
 
         .game-card:hover {
@@ -104,7 +105,7 @@
             margin: 10px 0;
             width: 85%;
             text-align: center;
-            font-size: 1.2rem; /* Más grande para móviles */
+            font-size: 1.2rem;
         }
 
         .btn {
@@ -150,7 +151,6 @@
     </div>
 
     <script>
-        // Forzamos conexión limpia
         const socket = io({ reconnection: true }); 
         let soyAnfitrion = false;
         let idSalaActual = null;
@@ -183,14 +183,14 @@
             socket.emit('join_room', { roomId: id.toString(), password: pass });
         }
 
-        // Lógica de Sockets
+        // --- Lógica de Sockets ---
         socket.on('room_created', (data) => {
             idSalaActual = data.roomId;
             info.innerHTML = `<span style="color:var(--neon-green)">SALA: ${data.roomId}</span><br>Comparte el ID con tu rival`;
         });
 
         socket.on('player_joined', (data) => {
-            // CAMBIO VITAL: Ambos jugadores aseguran el ID de sala aquí
+            // Aseguramos que ambos tengan el mismo ID de sala antes de arrancar
             idSalaActual = data.roomId; 
             console.log("Iniciando partida en sala:", idSalaActual);
             closeModal();
@@ -204,25 +204,17 @@
             
             uiLayer.style.display = "none";
             gameContainer.style.display = "block";
-            gameContainer.innerHTML = ""; // Limpiar antes de inyectar canvas
+            gameContainer.innerHTML = ""; // Limpiar rastro de juegos anteriores
 
-            // Llamada a los juegos con parámetros garantizados
+            // Lanzador de juegos
             if(nombre === "CARRERA 2D") {
-                if(typeof startRacing === 'function') {
-                    startRacing(idSalaActual, soyAnfitrion);
-                }
+                if(typeof startRacing === 'function') startRacing(idSalaActual, soyAnfitrion);
             } else if(nombre === "PING PONG") {
-                if(typeof startPingPong === 'function') {
-                    startPingPong(idSalaActual, soyAnfitrion);
-                }
+                if(typeof startPingPong === 'function') startPingPong(idSalaActual, soyAnfitrion);
             } else if(nombre === "TETRIX") {
-                if(typeof startTetrix === 'function') {
-                    startTetrix(idSalaActual, soyAnfitrion);
-                }
+                if(typeof startTetrix === 'function') startTetrix(idSalaActual, soyAnfitrion);
             } else if(nombre === "TIRO") {
-                if(typeof startTiro === 'function') {
-                    startTiro(idSalaActual, soyAnfitrion);
-                }
+                if(typeof startTiro === 'function') startTiro(idSalaActual, soyAnfitrion);
             }
         }
     </script>
