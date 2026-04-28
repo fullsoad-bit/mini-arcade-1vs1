@@ -11,11 +11,11 @@
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-        // 2. Creación del socket global (Debe ir arriba para evitar errores)
+        // 2. Creación del socket global
         const socket = io(); 
     </script>
 
-    <!-- 3. Scripts de Juegos con rompe-caché -->
+    <!-- 3. Scripts de Juegos -->
     <script src="/js/pingpong.js?v=dexter_final"></script>
     <script src="/js/carrera.js?v=dexter_final"></script>
     <script src="/js/tetrix.js?v=dexter_final"></script>
@@ -121,21 +121,22 @@
         footer { position: fixed; bottom: 20px; right: 20px; z-index: 5000; }
         .frutilla { font-size: 45px; filter: drop-shadow(0 0 10px red); cursor: pointer; user-select: none; }
 
-        /* --- ESTILOS DEL EASTER EGG (CARAS DE PABLO) --- */
+        /* --- ESTILOS DEL EASTER EGG (CARAS DE PABLO CORREGIDAS) --- */
         .pablo-head {
             position: fixed;
-            width: 100px;
-            height: 100px;
+            width: 90px;
+            height: 90px;
             border-radius: 50%;
-            background-image: url('/pablo.jpg'); /* Tu foto original en /public/pablo.jpg */
-            background-size: 320%;        /* Zoom a la cara */
-            background-position: 51% 20%; /* Centro de la cara */
+            background-image: url('/pablo.jpg'); 
+            /* Ajuste de encuadre: bajamos el porcentaje para que no se vea solo la frente */
+            background-size: cover;        
+            background-position: center 25%; 
             background-repeat: no-repeat;
             border: 3px solid var(--neon-pink);
             z-index: 9999;
             cursor: pointer;
             box-shadow: 0 0 20px var(--neon-pink);
-            animation: floatMove 8s infinite ease-in-out, rotateSlow 4s infinite linear;
+            animation: floatMove 8s infinite ease-in-out, rotateSlow 6s infinite linear;
         }
 
         @keyframes floatMove {
@@ -197,16 +198,13 @@
         let clicksFrutilla = 0;
         let timerFrutilla;
 
-        // Función secreta de la frutilla
         function handleStrawberryClick() {
             clicksFrutilla++;
             clearTimeout(timerFrutilla);
-            
             if (clicksFrutilla === 3) {
                 spawnPablos();
                 clicksFrutilla = 0;
             } else {
-                // Si no presiona 3 veces en medio segundo, se resetea
                 timerFrutilla = setTimeout(() => { 
                     clicksFrutilla = 0; 
                     alert('¡Gracias por jugar con nuestra página!'); 
@@ -220,13 +218,10 @@
                 head.className = 'pablo-head';
                 head.style.left = Math.random() * 70 + 'vw';
                 head.style.top = Math.random() * 70 + 'vh';
-                
-                // Efecto explotar al tocar
                 head.onclick = function() {
                     this.classList.add('explode');
                     setTimeout(() => { this.remove(); }, 400);
                 };
-
                 document.body.appendChild(head);
             }
         }
