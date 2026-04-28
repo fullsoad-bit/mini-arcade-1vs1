@@ -2,10 +2,11 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Viewport optimizado para Android: evita zoom y desplazamientos accidentales -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MINI 1vs1 | Arcade Online</title>
     
-    <!-- Google Fonts: Press Start 2P para el toque retro -->
+    <!-- Google Fonts cargadas correctamente -->
     <link href="https://googleapis.com" rel="stylesheet">
     
     <!-- Librería Socket.io -->
@@ -34,13 +35,13 @@
             align-items: center;
             min-height: 100vh;
             overflow-x: hidden;
-            touch-action: manipulation; /* Optimiza toques en móvil */
+            touch-action: manipulation;
         }
 
-        #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; }
-        #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; }
+        #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; padding-bottom: 50px; }
+        #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; position: relative; }
 
-        /* Efecto Monitor CRT Scanlines */
+        /* Efecto Monitor CRT */
         body::before {
             content: " ";
             display: block;
@@ -53,12 +54,12 @@
             pointer-events: none;
         }
 
-        h1 { font-family: 'Press Start 2P', cursive; font-size: 1.8rem; color: var(--neon-pink); margin-top: 30px; text-shadow: 0 0 10px var(--neon-pink); }
+        h1 { font-family: 'Press Start 2P', cursive; font-size: 1.5rem; color: var(--neon-pink); margin-top: 30px; text-shadow: 0 0 10px var(--neon-pink); text-align: center; }
 
         .game-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
             width: 90%;
             max-width: 800px;
             margin-top: 20px;
@@ -67,13 +68,12 @@
         .game-card {
             font-family: 'Press Start 2P', cursive;
             border: 3px solid var(--neon-green);
-            padding: 20px;
+            padding: 15px;
             text-align: center;
             cursor: pointer;
             background: rgba(57, 255, 20, 0.05);
             transition: 0.2s;
-            font-size: 0.7rem;
-            line-height: 1.4;
+            font-size: 0.6rem;
         }
 
         .game-card:hover {
@@ -82,7 +82,6 @@
             box-shadow: 0 0 15px var(--neon-green);
         }
 
-        /* Modal Mejorado para Móvil */
         #room-modal {
             display: none;
             position: fixed;
@@ -90,11 +89,11 @@
             transform: translate(-50%, -50%);
             background: #000;
             border: 4px solid var(--neon-pink);
-            padding: 30px;
+            padding: 20px;
             z-index: 2000;
             text-align: center;
             width: 85%;
-            max-width: 400px;
+            max-width: 350px;
         }
 
         input {
@@ -103,9 +102,9 @@
             color: var(--neon-green);
             padding: 12px;
             margin: 10px 0;
-            width: 90%;
+            width: 85%;
             text-align: center;
-            font-size: 1rem;
+            font-size: 1.2rem; /* Más grande para móviles */
         }
 
         .btn {
@@ -120,8 +119,6 @@
             margin-top: 10px;
         }
 
-        .btn:active { transform: scale(0.98); }
-
         .status-msg { margin-top: 15px; color: #fff; font-size: 0.8rem; min-height: 40px; }
     </style>
 </head>
@@ -129,7 +126,7 @@
 
     <div id="ui-layer">
         <h1>MINI 1vs1</h1>
-        <p style="font-family: 'Press Start 2P'; font-size: 0.6rem;">ARCADE MULTIJUGADOR</p>
+        <p style="font-family: 'Press Start 2P'; font-size: 0.5rem; color: #fff;">ARCADE MULTIJUGADOR</p>
 
         <div class="game-grid">
             <div class="game-card" onclick="openModal('PING PONG')">PING PONG</div>
@@ -141,26 +138,22 @@
 
     <div id="game-container"></div>
 
-    <!-- Modal de Salas -->
     <div id="room-modal">
-        <h2 id="selected-game-title" style="font-family: 'Press Start 2P'; font-size: 0.9rem; color: var(--neon-pink);">JUEGO</h2>
-        
-        <button class="btn" style="background: #333; border: 1px solid var(--neon-green);" onclick="generateRoom()">CREAR SALA</button>
+        <h2 id="selected-game-title" style="font-family: 'Press Start 2P'; font-size: 0.8rem; color: var(--neon-pink);">JUEGO</h2>
+        <button class="btn" style="background: #222; border: 1px solid var(--neon-green);" onclick="generateRoom()">CREAR SALA</button>
         <div id="room-info" class="status-msg"></div>
-        
         <hr style="border: 0; border-top: 1px solid #333; margin: 15px 0;">
-        
-        <input type="text" id="room-id" placeholder="ID DE SALA">
-        <input type="password" id="room-pass" placeholder="PASSWORD (123)">
-        
+        <input type="number" id="room-id" placeholder="ID SALA" pattern="\d*">
+        <input type="text" id="room-pass" placeholder="PASSWORD" value="123">
         <button class="btn" onclick="joinRoom()">UNIRSE</button>
         <p onclick="closeModal()" style="cursor:pointer; font-size: 0.6rem; margin-top: 20px; color: #555;">[ CANCELAR ]</p>
     </div>
 
     <script>
-        const socket = io(); 
+        // Forzamos conexión limpia
+        const socket = io({ reconnection: true }); 
         let soyAnfitrion = false;
-        let idSalaActual = "";
+        let idSalaActual = null;
 
         const uiLayer = document.getElementById('ui-layer');
         const gameContainer = document.getElementById('game-container');
@@ -171,7 +164,7 @@
         function openModal(gameName) {
             modal.style.display = 'block';
             title.innerText = gameName;
-            info.innerHTML = "Introduce datos o genera sala";
+            info.innerHTML = "Genera una sala o únete a una";
         }
 
         function closeModal() { modal.style.display = 'none'; }
@@ -185,18 +178,21 @@
         function joinRoom() {
             const id = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value || "123";
+            if(!id) return alert("Escribe el ID de sala");
             soyAnfitrion = false;
-            socket.emit('join_room', { roomId: id, password: pass });
+            socket.emit('join_room', { roomId: id.toString(), password: pass });
         }
 
-        // Escuchadores de Socket
+        // Lógica de Sockets
         socket.on('room_created', (data) => {
             idSalaActual = data.roomId;
-            info.innerHTML = `<span style="color:var(--neon-green)">SALA: ${data.roomId}</span><br>Esperando rival...`;
+            info.innerHTML = `<span style="color:var(--neon-green)">SALA: ${data.roomId}</span><br>Comparte el ID con tu rival`;
         });
 
         socket.on('player_joined', (data) => {
-            idSalaActual = data.roomId;
+            // CAMBIO VITAL: Ambos jugadores aseguran el ID de sala aquí
+            idSalaActual = data.roomId; 
+            console.log("Iniciando partida en sala:", idSalaActual);
             closeModal();
             iniciarJuego(data.game);
         });
@@ -204,18 +200,29 @@
         socket.on('error_msg', (msg) => { alert(msg); });
 
         function iniciarJuego(nombre) {
+            if(!idSalaActual) return;
+            
             uiLayer.style.display = "none";
             gameContainer.style.display = "block";
-            
-            // Lógica de inicio por juego
+            gameContainer.innerHTML = ""; // Limpiar antes de inyectar canvas
+
+            // Llamada a los juegos con parámetros garantizados
             if(nombre === "CARRERA 2D") {
-                if(typeof startRacing === 'function') startRacing(idSalaActual, soyAnfitrion);
+                if(typeof startRacing === 'function') {
+                    startRacing(idSalaActual, soyAnfitrion);
+                }
             } else if(nombre === "PING PONG") {
-                if(typeof startPingPong === 'function') startPingPong(idSalaActual, soyAnfitrion);
+                if(typeof startPingPong === 'function') {
+                    startPingPong(idSalaActual, soyAnfitrion);
+                }
             } else if(nombre === "TETRIX") {
-                if(typeof startTetrix === 'function') startTetrix(idSalaActual, soyAnfitrion);
+                if(typeof startTetrix === 'function') {
+                    startTetrix(idSalaActual, soyAnfitrion);
+                }
             } else if(nombre === "TIRO") {
-                if(typeof startTiro === 'function') startTiro(idSalaActual, soyAnfitrion);
+                if(typeof startTiro === 'function') {
+                    startTiro(idSalaActual, soyAnfitrion);
+                }
             }
         }
     </script>
