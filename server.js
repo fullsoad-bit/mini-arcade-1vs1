@@ -17,35 +17,27 @@ io.on('connection', (socket) => {
         rooms[roomId] = { password: data.password, game: data.game, players: [socket.id] };
         socket.join(roomId);
         socket.emit('room_created', { roomId, password: data.password });
+        console.log(`🏠 Sala ${roomId} creada`);
     });
 
     socket.on('join_room', (data) => {
-        const room = rooms[data.roomId];
+        const rId = data.roomId.toString();
+        const room = rooms[rId];
         if (room && room.password === data.password) {
-            socket.join(data.roomId);
+            socket.join(rId);
             if (!room.players.includes(socket.id)) room.players.push(socket.id);
-            
-            // Notificar a todos en la sala que la partida comienza
-            io.to(data.roomId).emit('player_joined', { 
-                roomId: data.roomId, 
-                game: room.game 
-            });
+            // Notificar a toda la sala
+            io.to(rId).emit('player_joined', { roomId: rId, game: room.game });
+            console.log(`🎮 Jugador unido a sala ${rId}`);
         } else {
-            socket.emit('error_msg', 'ID o Password incorrectos');
+            socket.emit('error_msg', 'Sala no encontrada o password incorrecto');
         }
     });
 
-    // TRANSMISOR DE OBSTÁCULOS Y EVENTOS
+    // TRANSMISOR UNIVERSAL: Todo lo que llegue por aquí se reenvía al rival
     socket.on('broadcast', (data) => {
         if (data.roomId) {
-            socket.to(data.roomId).emit('broadcast', data);
-        }
-    });
-
-    // TRANSMISOR DE MOVIMIENTO
-    socket.on('player_move', (data) => {
-        if (data.roomId) {
-            socket.to(data.roomId).emit('opponent_move', data);
+            socket.to(data.roomId.toString()).emit('broadcast', data);
         }
     });
 
@@ -59,7 +51,7 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 http.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 SERVIDOR OK EN PUERTO ${PORT}`);
 });
