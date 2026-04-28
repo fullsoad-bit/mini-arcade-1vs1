@@ -5,13 +5,7 @@ const baseWidth = 400;
 const baseHeight = 600;
 canvasRacing.width = baseWidth;
 canvasRacing.height = baseHeight;
-canvasRacing.style.backgroundColor = "#0d0208";
-canvasRacing.style.border = "4px solid #FF00FF";
-canvasRacing.style.display = "block";
-canvasRacing.style.margin = "10px auto";
-canvasRacing.style.maxWidth = "95vw";
-canvasRacing.style.maxHeight = "70vh";
-canvasRacing.style.touchAction = "none";
+canvasRacing.style.cssText = "background:#0d0208; border:4px solid #FF00FF; display:block; margin:10px auto; max-width:90vw; max-height:70vh; touch-action:none;";
 
 let racingRoomId = null;
 let racingRole = "spectator";
@@ -35,7 +29,9 @@ function startRacing(roomId, isHost) {
     isRacingActive = true;
     obstacles = [];
     timeLeft = 60;
-    
+    carHost.crashes = 0;
+    carGuest.crashes = 0;
+
     const container = document.getElementById('game-container');
     container.innerHTML = "";
     container.appendChild(canvasRacing);
@@ -50,148 +46,115 @@ function startRacing(roomId, isHost) {
 
     if (isHost) {
         if (obstacleInterval) clearInterval(obstacleInterval);
-        obstacleInterval = setInterval(spawnObstacle, 900);
+        obstacleInterval = setInterval(() => {
+            if(isRacingActive) obstacles.push({ x: Math.random() * 300 + 40, y: -50 });
+        }, 900);
     }
 
     renderRacing();
 }
 
-// ESCUCHADORES DE RED
+// --- COMUNICACIÓN DE RED ---
 if (typeof socket !== 'undefined') {
     socket.on('opponent_move', (data) => {
-        if (isRacingActive) {
-            if (data.role === 'host') carHost.x = data.x;
-            else carGuest.x = data.x;
-        }
+        if (data.role === 'host') carHost.x = data.x;
+        else carGuest.x = data.x;
     });
 
-    socket.on('opponent_event', (data) => {
+    socket.on('broadcast', (data) => {
         if (!isRacingActive) return;
-
-        // El Invitado recibe la lista de obstáculos del Host
-        if (data.type === 'sync_obstacles' && racingRole === 'guest') {
-            obstacles = data.obsList;
+        // El Guest recibe obstáculos del Host
+        if (data.type === 'sync_obs' && racingRole === 'guest') {
+            obstacles = data.list;
         }
-
-        // Sincronizar choques para que ambos vean la explosión/stun
-        if (data.type === 'stun') {
-            const targetCar = (data.role === 'host') ? carHost : carGuest;
-            targetCar.stun = 50;
-            targetCar.crashes = data.crashes;
+        // Ambos reciben aviso de choque
+        if (data.type === 'collision') {
+            const car = (data.role === 'host') ? carHost : carGuest;
+            car.stun = 50;
+            car.crashes = data.total;
         }
     });
-}
-
-function spawnObstacle() {
-    if (racingRole === 'host' && isRacingActive) {
-        const obs = { x: Math.random() * 300 + 40, y: -50, color: "#FF3131" };
-        obstacles.push(obs);
-    }
 }
 
 function movePlayer(dir) {
     if (!isRacingActive) return;
-    let myCar = (racingRole === 'host') ? carHost : carGuest;
-    if (myCar.stun > 0) return;
+    let my = (racingRole === 'host') ? carHost : carGuest;
+    if (my.stun > 0) return;
 
-    if (dir === "left" && myCar.x > 15) myCar.x -= 20;
-    if (dir === "right" && myCar.x < 345) myCar.x += 20;
+    if (dir === "left" && my.x > 20) my.x -= 20;
+    if (dir === "right" && my.x < 340) my.x += 20;
 
-    socket.emit('player_move', { roomId: racingRoomId, x: myCar.x, role: racingRole });
+    socket.emit('player_move', { roomId: racingRoomId, x: my.x, role: racingRole });
 }
 
 function renderRacing() {
     if (!isRacingActive) return;
-
-    ctxRacing.fillStyle = "#0d0208";
-    ctxRacing.fillRect(0, 0, baseWidth, baseHeight);
+    ctxRacing.clearRect(0, 0, baseWidth, baseHeight);
     
-    // Lógica del Host: Mueve y envía
+    // El Host mueve obstáculos y los "transmite"
     if (racingRole === 'host') {
-        obstacles.forEach(obs => obs.y += racingSpeed);
-        obstacles = obstacles.filter(obs => obs.y < baseHeight + 50);
-        
-        // ENVÍO CRÍTICO: El Host manda sus posiciones al Guest
-        socket.emit('game_event', {
-            roomId: racingRoomId,
-            type: 'sync_obstacles',
-            obsList: obstacles
-        });
+        obstacles.forEach(o => o.y += racingSpeed);
+        obstacles = obstacles.filter(o => o.y < 650);
+        socket.emit('broadcast', { roomId: racingRoomId, type: 'sync_obs', list: obstacles });
     }
 
-    // Dibujar Obstáculos
-    obstacles.forEach((obs) => {
-        ctxRacing.fillStyle = obs.color;
-        ctxRacing.fillRect(obs.x, obs.y, 40, 40);
+    // Dibujar y detectar colisión
+    obstacles.forEach(o => {
+        ctxRacing.fillStyle = "#FF3131";
+        ctxRacing.fillRect(o.x, o.y, 40, 40);
 
-        // Cada uno detecta su propio choque y avisa
-        let myCar = (racingRole === 'host') ? carHost : carGuest;
-        if (myCar.stun <= 0 && 
-            myCar.x < obs.x + 40 && myCar.x + carW > obs.x &&
-            myCar.y < obs.y + 40 && myCar.y + carH > obs.y) {
-            
-            myCar.stun = 50; 
-            myCar.crashes++;
-            socket.emit('game_event', { 
-                roomId: racingRoomId, type: 'stun', role: racingRole, crashes: myCar.crashes 
-            });
+        let my = (racingRole === 'host') ? carHost : carGuest;
+        if (my.stun <= 0 && my.x < o.x + 40 && my.x + carW > o.x && my.y < o.y + 40 && my.y + carH > o.y) {
+            my.stun = 50;
+            my.crashes++;
+            socket.emit('broadcast', { roomId: racingRoomId, type: 'collision', role: racingRole, total: my.crashes });
         }
     });
 
     drawCar(carHost);
     drawCar(carGuest);
 
-    // HUD
+    // HUD con puntajes sincronizados
     ctxRacing.fillStyle = "white";
     ctxRacing.font = "bold 16px Monospace";
-    ctxRacing.fillText(`⏱️ ${timeLeft}s`, 20, 30);
-    ctxRacing.fillText(`🚀 TU: ${(racingRole==='host'?carHost.crashes:carGuest.crashes)} | RIVAL: ${(racingRole==='host'?carGuest.crashes:carHost.crashes)}`, 20, 55);
+    ctxRacing.fillText(`⏱️ ${timeLeft}s`, 15, 30);
+    ctxRacing.fillText(`YO: ${racingRole==='host'?carHost.crashes:carGuest.crashes} | RIVAL: ${racingRole==='host'?carGuest.crashes:carHost.crashes}`, 15, 55);
 
-    roadOffset += racingSpeed;
     requestAnimationFrame(renderRacing);
 }
 
-function drawCar(car) {
-    if (car.stun > 0) {
-        car.stun--;
-        if (Math.floor(Date.now() / 100) % 2 === 0) return;
-    }
-    ctxRacing.fillStyle = car.color;
-    ctxRacing.fillRect(car.x, car.y, carW, carH);
+function drawCar(c) {
+    if (c.stun > 0) { c.stun--; if (Math.floor(Date.now() / 100) % 2 === 0) return; }
+    ctxRacing.fillStyle = c.color;
+    ctxRacing.fillRect(c.x, c.y, carW, carH);
 }
 
 function endRacing() {
     isRacingActive = false;
     clearInterval(timerInterval);
     clearInterval(obstacleInterval);
-    alert(`FIN! Choques: ${racingRole === 'host' ? carHost.crashes : carGuest.crashes}`);
+    alert(`CARRERA FINALIZADA\nChoques propios: ${racingRole==='host'?carHost.crashes:carGuest.crashes}`);
     window.location.reload();
 }
 
-window.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowLeft") movePlayer("left");
-    if (e.key === "ArrowRight") movePlayer("right");
-});
+function setupMobileControls(cont) {
+    const d = document.createElement('div');
+    d.style.cssText = "display:flex; justify-content:space-around; width:100%; margin-top:10px;";
+    const bS = "width:45%; height:70px; background:#FF00FF33; border:2px solid #FF00FF; color:white; font-size:30px; display:flex; align-items:center; justify-content:center; border-radius:10px; user-select:none;";
+    
+    const l = document.createElement('div'); l.innerHTML = "◀️"; l.style.cssText = bS;
+    const r = document.createElement('div'); r.innerHTML = "▶️"; r.style.cssText = bS;
 
-function setupMobileControls(container) {
-    const controlsDiv = document.createElement('div');
-    controlsDiv.style.cssText = "display:flex; justify-content:space-between; width:95vw; margin:10px auto;";
+    l.ontouchstart = (e) => { e.preventDefault(); movePlayer("left"); };
+    r.ontouchstart = (e) => { e.preventDefault(); movePlayer("right"); };
+    l.onclick = () => movePlayer("left");
+    r.onclick = () => movePlayer("right");
 
-    const btnStyle = `width:46%; height:75px; background:rgba(255,0,255,0.2); border:2px solid #FF00FF; border-radius:10px; color:white; font-size:30px; display:flex; align-items:center; justify-content:center; user-select:none; -webkit-tap-highlight-color:transparent;`;
-
-    const btnL = document.createElement('div'); btnL.innerHTML = "◀️"; btnL.style.cssText = btnStyle;
-    const btnR = document.createElement('div'); btnR.innerHTML = "▶️"; btnR.style.cssText = btnStyle;
-
-    let moveInt;
-    const start = (d) => { movePlayer(d); moveInt = setInterval(() => movePlayer(d), 100); };
-    const stop = () => clearInterval(moveInt);
-
-    btnL.addEventListener('touchstart', (e) => { e.preventDefault(); start("left"); });
-    btnL.addEventListener('touchend', stop);
-    btnR.addEventListener('touchstart', (e) => { e.preventDefault(); start("right"); });
-    btnR.addEventListener('touchend', stop);
-
-    controlsDiv.appendChild(btnL);
-    controlsDiv.appendChild(btnR);
-    container.appendChild(controlsDiv);
+    d.appendChild(l); d.appendChild(r);
+    cont.appendChild(d);
 }
+
+window.addEventListener("keydown", (e) => {
+    if(e.key === "ArrowLeft") movePlayer("left");
+    if(e.key === "ArrowRight") movePlayer("right");
+});
