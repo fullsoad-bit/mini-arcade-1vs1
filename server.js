@@ -10,8 +10,6 @@ app.use('/js', express.static(path.join(__dirname, 'public/js')));
 const rooms = {};
 
 io.on('connection', (socket) => {
-    console.log('🔌 Conectado:', socket.id);
-
     socket.on('create_room', (data) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
         rooms[roomId] = { password: data.password, game: data.game, players: [socket.id] };
@@ -23,18 +21,21 @@ io.on('connection', (socket) => {
         const rId = data.roomId.toString();
         const room = rooms[rId];
         if (room && room.password === data.password) {
-            socket.join(rId);
+            // UNIÓN FORZADA: Esperamos a que la unión sea efectiva
+            socket.join(rId); 
             if (!room.players.includes(socket.id)) room.players.push(socket.id);
-            // Notificamos inicio a toda la sala
-            io.to(rId).emit('player_joined', { roomId: rId, game: room.game });
+            
+            // Usamos io.in(rId) para asegurar que el mensaje llegue a TODOS en esa sala física
+            io.in(rId).emit('player_joined', { roomId: rId, game: room.game });
         } else {
-            socket.emit('error_msg', 'Sala no encontrada o Password incorrecto');
+            socket.emit('error_msg', 'Sala no encontrada o Password mal');
         }
     });
 
-    // CANAL MAESTRO: Retransmite CUALQUIER cosa que llegue por "sync"
+    // CANAL ÚNICO SINCRONIZADO
     socket.on('sync', (data) => {
         if (data.roomId) {
+            // socket.to envía a todos los DEMÁS en la sala rId
             socket.to(data.roomId.toString()).emit('sync', data);
         }
     });
@@ -50,4 +51,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 10000;
-http.listen(PORT, '0.0.0.0', () => console.log("Servidor Arcade Activo"));
+http.listen(PORT, '0.0.0.0', () => console.log("Servidor OK"));
