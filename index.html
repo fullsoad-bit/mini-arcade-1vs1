@@ -6,55 +6,87 @@
     <title>MINI 1vs1 | Arcade Online</title>
     <link href="https://googleapis.com" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
+    <!-- Scripts con rompe-caché para móviles -->
+    <script src="/js/pingpong.js?v=final"></script>
     <script src="/js/carrera.js?v=final"></script>
+    <script src="/js/tetrix.js?v=final"></script>
+    <script src="/js/tiro.js?v=final"></script>
     <style>
         :root { --neon-pink: #FF00FF; --neon-green: #39FF14; --bg: #0d0208; }
-        body { background: var(--bg); color: var(--neon-green); font-family: sans-serif; text-align: center; margin: 0; overflow-x: hidden; touch-action: manipulation; }
+        body { background: var(--bg); color: var(--neon-green); font-family: sans-serif; text-align: center; margin: 0; touch-action: manipulation; }
         #ui-layer { padding: 20px; }
-        .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; width: 90%; margin: 20px auto; }
-        .game-card { border: 3px solid var(--neon-green); padding: 15px; cursor: pointer; font-family: 'Press Start 2P', cursive; font-size: 0.6rem; }
-        #room-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 4px solid var(--neon-pink); padding: 20px; z-index: 2000; width: 80%; max-width: 300px; }
-        input { background: #111; border: 2px solid var(--neon-green); color: #fff; padding: 10px; width: 80%; margin: 10px 0; text-align: center; }
-        .btn { background: var(--neon-pink); color: #fff; border: none; padding: 10px; width: 100%; cursor: pointer; font-family: 'Press Start 2P', cursive; font-size: 0.6rem; }
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; width: 90%; margin: 20px auto; }
+        .game-card { border: 3px solid var(--neon-green); padding: 15px; cursor: pointer; font-family: 'Press Start 2P', cursive; font-size: 0.6rem; background: rgba(57, 255, 20, 0.05); }
+        .game-card:hover { background: var(--neon-green); color: #000; }
+        #room-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 4px solid var(--neon-pink); padding: 20px; z-index: 2000; width: 85%; max-width: 300px; }
+        input { background: #111; border: 2px solid var(--neon-green); color: #fff; padding: 12px; width: 85%; margin: 10px 0; text-align: center; font-size: 1rem; }
+        .btn { background: var(--neon-pink); color: #fff; border: none; padding: 12px; width: 100%; cursor: pointer; font-family: 'Press Start 2P', cursive; font-size: 0.6rem; margin-top: 5px; }
         #game-container { display: none; width: 100%; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div id="ui-layer">
-        <h1 style="color:var(--neon-pink); font-family:'Press Start 2P'; font-size:1.2rem;">MINI 1vs1</h1>
+        <h1 style="color:var(--neon-pink); font-family:'Press Start 2P'; margin-top:40px;">MINI 1vs1</h1>
         <div class="game-grid">
+            <div class="game-card" onclick="openModal('PING PONG')">PING PONG</div>
             <div class="game-card" onclick="openModal('CARRERA 2D')">CARRERA 2D</div>
+            <div class="game-card" onclick="openModal('TETRIX')">TETRIX</div>
+            <div class="game-card" onclick="openModal('TIRO')">TIRO AL BLANCO</div>
         </div>
     </div>
     <div id="game-container"></div>
     <div id="room-modal">
-        <h2 id="modal-title" style="font-size:0.8rem;">JUEGO</h2>
+        <h2 id="modal-title" style="font-size:0.7rem; color:var(--neon-pink);">JUEGO</h2>
         <button class="btn" onclick="generateRoom()">CREAR SALA</button>
-        <div id="room-info" style="font-size:0.7rem; margin:10px 0;"></div>
-        <hr style="border:1px solid #333;">
+        <div id="room-info" style="font-size:0.8rem; margin:10px 0; color:#fff;"></div>
+        <hr style="border:1px solid #333; margin:15px 0;">
         <input type="number" id="room-id" placeholder="ID SALA">
         <input type="text" id="room-pass" placeholder="PASS" value="123">
         <button class="btn" onclick="joinRoom()">UNIRSE</button>
-        <p onclick="closeModal()" style="cursor:pointer; font-size:0.6rem; color:#666;">[ CERRAR ]</p>
+        <p onclick="closeModal()" style="cursor:pointer; font-size:0.6rem; color:#666; margin-top:15px;">[ CERRAR ]</p>
     </div>
     <script>
         const socket = io();
         let soyAnfitrion = false;
-        let idSalaActual = null;
+        let idSalaActual = "";
 
-        function openModal(g) { document.getElementById('room-modal').style.display = 'block'; document.getElementById('modal-title').innerText = g; }
+        function openModal(g) { 
+            document.getElementById('room-modal').style.display = 'block'; 
+            document.getElementById('modal-title').innerText = g; 
+            document.getElementById('room-info').innerText = "";
+        }
         function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
-        function generateRoom() { soyAnfitrion = true; socket.emit('create_room', { password: document.getElementById('room-pass').value || "123", game: document.getElementById('modal-title').innerText }); }
-        function joinRoom() { soyAnfitrion = false; socket.emit('join_room', { roomId: document.getElementById('room-id').value, password: document.getElementById('room-pass').value || "123" }); }
+        
+        function generateRoom() { 
+            soyAnfitrion = true; 
+            socket.emit('create_room', { password: document.getElementById('room-pass').value || "123", game: document.getElementById('modal-title').innerText }); 
+        }
+        function joinRoom() { 
+            soyAnfitrion = false; 
+            socket.emit('join_room', { roomId: document.getElementById('room-id').value, password: document.getElementById('room-pass').value || "123" }); 
+        }
 
-        socket.on('room_created', (data) => { idSalaActual = data.roomId; document.getElementById('room-info').innerText = "SALA: " + data.roomId; });
-        socket.on('player_joined', (data) => { idSalaActual = data.roomId; closeModal(); iniciarJuego(data.game); });
+        socket.on('room_created', (data) => { 
+            idSalaActual = data.roomId.toString(); 
+            document.getElementById('room-info').innerHTML = "SALA: " + data.roomId + "<br>Esperando rival..."; 
+        });
+        
+        socket.on('player_joined', (data) => { 
+            idSalaActual = data.roomId.toString(); 
+            closeModal(); 
+            iniciarJuego(data.game); 
+        });
+        
         socket.on('error_msg', (m) => alert(m));
 
         function iniciarJuego(n) {
             document.getElementById('ui-layer').style.display = "none";
             document.getElementById('game-container').style.display = "block";
+            // Llamamos a los juegos pasando el ID de sala
             if(n === "CARRERA 2D") startRacing(idSalaActual, soyAnfitrion);
+            if(n === "PING PONG") startPingPong(idSalaActual, soyAnfitrion);
+            if(n === "TETRIX") startTetrix(idSalaActual, soyAnfitrion);
+            if(n === "TIRO") startTiro(idSalaActual, soyAnfitrion);
         }
     </script>
 </body>
