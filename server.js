@@ -10,43 +10,38 @@ app.use('/js', express.static(path.join(__dirname, 'public/js')));
 const rooms = {};
 
 io.on('connection', (socket) => {
-    console.log('🔌 Nuevo dispositivo conectado:', socket.id);
+    console.log('🔌 Conectado:', socket.id);
 
     socket.on('create_room', (data) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
         rooms[roomId] = { password: data.password, game: data.game, players: [socket.id] };
         socket.join(roomId);
         socket.emit('room_created', { roomId, password: data.password });
-        console.log(`🏠 Sala ${roomId} creada`);
     });
 
     socket.on('join_room', (data) => {
         const room = rooms[data.roomId];
         if (room && room.password === data.password) {
-            // Unirse a la sala física de Socket.io
             socket.join(data.roomId);
             if (!room.players.includes(socket.id)) room.players.push(socket.id);
             
-            // Emitir a TODOS en la sala para sincronizar el inicio
+            // Emitir a TODA la sala para que el Jugador 1 y el Jugador 2 inicien al mismo tiempo
             io.to(data.roomId).emit('player_joined', { 
                 roomId: data.roomId, 
                 game: room.game 
             });
-            console.log(`🎮 Jugador ${socket.id} entró a sala ${data.roomId}`);
         } else {
             socket.emit('error_msg', 'ID o Password incorrectos');
         }
     });
 
-    // CANAL DE DATOS ULTRA-RÁPIDO (Obstáculos y Choques)
+    // RETRANSMISOR UNIVERSAL
     socket.on('broadcast', (data) => {
         if (data.roomId) {
-            // Enviamos a los DEMÁS en la sala
             socket.to(data.roomId).emit('broadcast', data);
         }
     });
 
-    // CANAL DE MOVIMIENTO
     socket.on('player_move', (data) => {
         if (data.roomId) {
             socket.to(data.roomId).emit('opponent_move', data);
@@ -54,11 +49,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnecting', () => {
-        socket.rooms.forEach(roomId => {
-            if (rooms[roomId]) {
-                rooms[roomId].players = rooms[roomId].players.filter(id => id !== socket.id);
-                if (rooms[roomId].players.length === 0) delete rooms[roomId];
-                else io.to(roomId).emit('error_msg', 'El rival se ha desconectado.');
+        socket.rooms.forEach(id => {
+            if (rooms[id]) {
+                rooms[id].players = rooms[id].players.filter(p => p !== socket.id);
+                if (rooms[id].players.length === 0) delete rooms[id];
             }
         });
     });
