@@ -1,154 +1,125 @@
 const canvasRacing = document.createElement('canvas');
 const ctxRacing = canvasRacing.getContext('2d');
 
-const baseWidth = 400;
-const baseHeight = 600;
-canvasRacing.width = baseWidth;
-canvasRacing.height = baseHeight;
-canvasRacing.style.cssText = "background:#0d0208; border:4px solid #FF00FF; display:block; margin:10px auto; max-width:95vw; max-height:65vh; touch-action:none; border-radius:10px;";
+canvasRacing.width = 400;
+canvasRacing.height = 600;
+canvasRacing.style.cssText = "background:#0d0208; border:4px solid #FF00FF; display:block; margin:10px auto; max-width:95vw; height:auto; touch-action:none;";
 
 let racingRoomId = null;
-let racingRole = "spectator"; 
+let racingRole = "spectator";
 let isRacingActive = false;
 
-const carW = 40, carH = 70;
 let carHost = { x: 100, y: 480, color: "#39FF14", stun: 0, crashes: 0 };
 let carGuest = { x: 260, y: 480, color: "#FF00FF", stun: 0, crashes: 0 };
-
 let obstacles = [];
-let racingSpeed = 7;
+let racingSpeed = 6;
 let timeLeft = 60;
 let timerInterval, obstacleInterval;
 
 function startRacing(roomId, isHost) {
-    console.log("Sincronizando juego en sala:", roomId);
-    racingRoomId = roomId; 
+    console.log("Juego activado en sala:", roomId);
+    racingRoomId = roomId;
     racingRole = isHost ? 'host' : 'guest';
     isRacingActive = true;
-    
-    // Reset de posiciones iniciales
-    carHost.x = 100; carHost.crashes = 0; carHost.stun = 0;
-    carGuest.x = 260; carGuest.crashes = 0; carGuest.stun = 0;
     obstacles = [];
     timeLeft = 60;
+    
+    // Resetear coches
+    carHost.crashes = 0; carGuest.crashes = 0;
+    carHost.stun = 0; carGuest.stun = 0;
 
     const container = document.getElementById('game-container');
     container.innerHTML = "";
     container.appendChild(canvasRacing);
 
-    // Detectar si es móvil para poner botones
+    // Controles para celulares Android
     if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
-        setupMobileControls(container);
+        setupMobileButtons(container);
     }
 
     if (timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(() => { 
-        if (timeLeft > 0) timeLeft--; 
+    timerInterval = setInterval(() => {
+        if (timeLeft > 0) timeLeft--;
         else endRacing();
     }, 1000);
 
     if (isHost) {
         if (obstacleInterval) clearInterval(obstacleInterval);
         obstacleInterval = setInterval(() => {
-            if(isRacingActive) {
-                const newObs = { x: Math.random() * 310 + 20, y: -50 };
-                obstacles.push(newObs);
-            }
-        }, 850);
+            if(isRacingActive) obstacles.push({ x: Math.random() * 320 + 20, y: -50 });
+        }, 1000);
     }
 
     renderRacing();
 }
 
-// --- ESCUCHADORES DE RED (EVENTOS ENTRANTES) ---
-if (typeof socket !== 'undefined') {
-    socket.on('opponent_move', (data) => {
-        if (!isRacingActive) return;
-        if (data.role === 'host') carHost.x = data.x;
-        else carGuest.x = data.x;
-    });
+// RECIBIR DATOS DEL RIVAL
+socket.on('opponent_move', (data) => {
+    if (!isRacingActive) return;
+    if (data.role === 'host') carHost.x = data.x;
+    else carGuest.x = data.x;
+});
 
-    socket.on('broadcast', (data) => {
-        if (!isRacingActive) return;
-
-        // RECIBIR OBSTÁCULOS (Solo para el Guest)
-        if (data.type === 'sync_obs' && racingRole === 'guest') {
-            obstacles = data.list;
-        }
-
-        // RECIBIR CHOQUES (Ambos jugadores se enteran)
-        if (data.type === 'collision') {
-            const victim = (data.role === 'host') ? carHost : carGuest;
-            victim.stun = 50;
-            victim.crashes = data.total;
-        }
-    });
-}
+socket.on('broadcast', (data) => {
+    if (!isRacingActive) return;
+    
+    // Sincronizar obstáculos (Solo el Guest los recibe)
+    if (data.type === 'obs' && racingRole === 'guest') {
+        obstacles = data.list;
+    }
+    
+    // Sincronizar choques (Ambos se enteran)
+    if (data.type === 'hit') {
+        const car = (data.role === 'host') ? carHost : carGuest;
+        car.stun = 40;
+        car.crashes = data.total;
+    }
+});
 
 function movePlayer(dir) {
     if (!isRacingActive) return;
     let my = (racingRole === 'host') ? carHost : carGuest;
     if (my.stun > 0) return;
 
-    if (dir === "left" && my.x > 15) my.x -= 25;
-    if (dir === "right" && my.x < 345) my.x += 25;
+    if (dir === "left" && my.x > 20) my.x -= 25;
+    if (dir === "right" && my.x < 340) my.x += 25;
 
-    // Emitir mi posición a mi rival
-    socket.emit('player_move', { 
-        roomId: racingRoomId, 
-        x: my.x, 
-        role: racingRole 
-    });
+    socket.emit('player_move', { roomId: racingRoomId, x: my.x, role: racingRole });
 }
 
 function renderRacing() {
     if (!isRacingActive) return;
-    ctxRacing.clearRect(0, 0, baseWidth, baseHeight);
-    
-    // El Host gestiona el movimiento de obstáculos y lo comparte
+    ctxRacing.clearRect(0, 0, 400, 600);
+
+    // El Host mueve y transmite los obstáculos
     if (racingRole === 'host') {
         obstacles.forEach(o => o.y += racingSpeed);
         obstacles = obstacles.filter(o => o.y < 650);
-        
-        socket.emit('broadcast', { 
-            roomId: racingRoomId, 
-            type: 'sync_obs', 
-            list: obstacles 
-        });
+        socket.emit('broadcast', { roomId: racingRoomId, type: 'obs', list: obstacles });
     }
 
-    // Dibujar obstáculos y detectar mi propio choque
+    // Dibujar obstáculos y detectar choque propio
     obstacles.forEach(o => {
         ctxRacing.fillStyle = "#FF3131";
-        ctxRacing.shadowBlur = 10;
-        ctxRacing.shadowColor = "#FF3131";
         ctxRacing.fillRect(o.x, o.y, 40, 40);
-        ctxRacing.shadowBlur = 0;
 
         let my = (racingRole === 'host') ? carHost : carGuest;
-        // Colisión simple por caja
         if (my.stun <= 0 && my.x < o.x + 40 && my.x + 40 > o.x && my.y < o.y + 40 && my.y + 70 > o.y) {
-            my.stun = 50;
+            my.stun = 40;
             my.crashes++;
-            // Aviso al rival que choqué
-            socket.emit('broadcast', { 
-                roomId: racingRoomId, 
-                type: 'collision', 
-                role: racingRole, 
-                total: my.crashes 
-            });
+            socket.emit('broadcast', { roomId: racingRoomId, type: 'hit', role: racingRole, total: my.crashes });
         }
     });
 
+    // Dibujar Coches
     drawCar(carHost);
     drawCar(carGuest);
 
-    // Interfaz de Usuario (Puntajes)
+    // Interfaz
     ctxRacing.fillStyle = "white";
-    ctxRacing.font = "bold 15px Arial";
-    ctxRacing.fillText(`⏳ ${timeLeft}s`, 10, 25);
-    ctxRacing.fillText(`YO: ${(racingRole==='host'?carHost.crashes:carGuest.crashes)}`, 10, 50);
-    ctxRacing.fillText(`RIVAL: ${(racingRole==='host'?carGuest.crashes:carHost.crashes)}`, 10, 75);
+    ctxRacing.font = "bold 14px Arial";
+    ctxRacing.fillText(`TIEMPO: ${timeLeft}s`, 10, 25);
+    ctxRacing.fillText(`YO: ${racingRole === 'host' ? carHost.crashes : carGuest.crashes} | RIVAL: ${racingRole === 'host' ? carGuest.crashes : carHost.crashes}`, 10, 50);
 
     requestAnimationFrame(renderRacing);
 }
@@ -156,40 +127,34 @@ function renderRacing() {
 function drawCar(c) {
     if (c.stun > 0) { 
         c.stun--; 
-        if (Math.floor(Date.now() / 100) % 2 === 0) return; // Efecto parpadeo
+        if (Math.floor(Date.now() / 100) % 2 === 0) return; 
     }
     ctxRacing.fillStyle = c.color;
-    ctxRacing.shadowBlur = 15;
-    ctxRacing.shadowColor = c.color;
     ctxRacing.fillRect(c.x, c.y, 40, 70);
-    ctxRacing.shadowBlur = 0;
 }
 
 function endRacing() {
     isRacingActive = false;
-    clearInterval(timerInterval);
-    clearInterval(obstacleInterval);
-    alert(`FIN DE LA CARRERA\nChoques propios: ${racingRole==='host'?carHost.crashes:carGuest.crashes}`);
+    alert("JUEGO TERMINADO");
     window.location.reload();
 }
 
-function setupMobileControls(cont) {
-    const d = document.createElement('div');
-    d.style.cssText = "display:flex; justify-content:space-between; width:90%; margin:15px auto;";
-    const bS = "width:48%; height:80px; background:rgba(57,255,20,0.15); border:3px solid #39FF14; color:white; font-size:40px; display:flex; align-items:center; justify-content:center; border-radius:15px; user-select:none; -webkit-tap-highlight-color:transparent;";
+function setupMobileButtons(container) {
+    const box = document.createElement('div');
+    box.style.cssText = "display:flex; justify-content:space-around; padding:15px;";
     
-    const l = document.createElement('div'); l.innerHTML = "◀️"; l.style.cssText = bS;
-    const r = document.createElement('div'); r.innerHTML = "▶️"; r.style.cssText = bS;
-
-    l.ontouchstart = (e) => { e.preventDefault(); movePlayer("left"); };
-    r.ontouchstart = (e) => { e.preventDefault(); movePlayer("right"); };
+    const btnL = document.createElement('button');
+    const btnR = document.createElement('button');
+    btnL.innerHTML = "◀️"; btnR.innerHTML = "▶️";
     
-    // Soporte para clics (por si acaso)
-    l.onclick = () => movePlayer("left");
-    r.onclick = () => movePlayer("right");
+    const style = "width:45%; height:80px; font-size:40px; background:#FF00FF33; border:2px solid #FF00FF; color:white; border-radius:10px;";
+    btnL.style.cssText = style; btnR.style.cssText = style;
 
-    d.appendChild(l); d.appendChild(r);
-    cont.appendChild(d);
+    btnL.ontouchstart = (e) => { e.preventDefault(); movePlayer("left"); };
+    btnR.ontouchstart = (e) => { e.preventDefault(); movePlayer("right"); };
+    
+    box.appendChild(btnL); box.appendChild(btnR);
+    container.appendChild(box);
 }
 
 window.addEventListener("keydown", (e) => {
