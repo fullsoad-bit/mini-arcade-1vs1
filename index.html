@@ -7,15 +7,12 @@
     
     <link href="https://googleapis.com" rel="stylesheet">
     
-    <!-- 1. Librería Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-        // 2. Creación del socket global
         const socket = io(); 
     </script>
 
-    <!-- 3. Scripts de Juegos con rompe-caché -->
     <script src="/js/pingpong.js?v=final_dexter"></script>
     <script src="/js/carrera.js?v=final_dexter"></script>
     <script src="/js/tetrix.js?v=final_dexter"></script>
@@ -41,50 +38,107 @@
         #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; padding-bottom: 80px; }
         #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; position: relative; }
 
-        /* Efecto Monitor CRT */
+        /* Efecto Monitor CRT ajustado para no oscurecer tanto */
         body::before {
             content: " ";
             display: block;
             position: fixed;
             top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
             z-index: 1000;
             background-size: 100% 3px, 3px 100%;
             pointer-events: none;
         }
 
-        h1 { font-family: 'Press Start 2P', cursive; font-size: 1.5rem; color: var(--neon-pink); margin-top: 40px; margin-bottom: 10px; text-shadow: 0 0 10px var(--neon-pink); text-align: center; }
+        /* Título más grande y legible */
+        h1 { 
+            font-family: 'Press Start 2P', cursive; 
+            font-size: 1.7rem; 
+            color: var(--neon-pink); 
+            margin-top: 40px; 
+            margin-bottom: 5px; 
+            text-shadow: 3px 3px 0px #000; /* Sombra sólida para legibilidad */
+            text-align: center; 
+        }
         
-        .subtitle { font-family: 'Press Start 2P', cursive; font-size: 0.6rem; color: #fff; margin-bottom: 30px; letter-spacing: 1px; }
-
-        .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; width: 90%; max-width: 800px; }
-        
-        .game-card { font-family: 'Press Start 2P', cursive; border: 3px solid var(--neon-green); padding: 15px; text-align: center; cursor: pointer; background: rgba(57, 255, 20, 0.05); transition: 0.2s; font-size: 0.6rem; }
-        .game-card:hover { background-color: var(--neon-green); color: black; box-shadow: 0 0 15px var(--neon-green); }
-
-        #room-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 4px solid var(--neon-pink); padding: 20px; z-index: 2000; text-align: center; width: 85%; max-width: 350px; }
-        
-        input { background: #111; border: 2px solid var(--neon-green); color: var(--neon-green); padding: 12px; margin: 10px 0; width: 85%; text-align: center; font-size: 1.2rem; }
-        
-        .btn { background: var(--neon-pink); color: white; border: none; padding: 15px; font-family: 'Press Start 2P', cursive; cursor: pointer; font-size: 0.6rem; width: 100%; margin-top: 10px; }
-
-        footer {
-            position: fixed;
-            bottom: 15px;
-            right: 15px;
-            z-index: 1001;
+        /* Subtítulo con fondo oscuro para resaltar */
+        .subtitle { 
+            font-family: 'Press Start 2P', cursive; 
+            font-size: 0.65rem; 
+            color: #fff; 
+            margin-bottom: 30px; 
+            letter-spacing: 1px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
         }
 
-        .frutilla {
-            font-size: 25px;
-            cursor: pointer;
-            filter: drop-shadow(0 0 5px red);
-            transition: transform 0.2s;
-            user-select: none;
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; width: 92%; max-width: 800px; }
+        
+        /* Cartas con texto más claro */
+        .game-card { 
+            font-family: 'Press Start 2P', cursive; 
+            border: 3px solid var(--neon-green); 
+            padding: 18px 10px; 
+            text-align: center; 
+            cursor: pointer; 
+            background: rgba(0, 0, 0, 0.8); /* Fondo más oscuro para que la letra verde resalte */
+            transition: 0.2s; 
+            font-size: 0.7rem; /* Un poco más grande */
+            font-weight: bold;
+            color: var(--neon-green);
+            text-shadow: 2px 2px 2px #000;
         }
 
-        .frutilla:active { transform: scale(1.4); }
+        .game-card:hover { background-color: var(--neon-green); color: black; text-shadow: none; }
+
+        /* Modal más legible */
+        #room-modal { 
+            display: none; 
+            position: fixed; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            background: #000; 
+            border: 4px solid var(--neon-pink); 
+            padding: 25px; 
+            z-index: 2000; 
+            text-align: center; 
+            width: 85%; 
+            max-width: 350px; 
+            box-shadow: 0 0 30px rgba(0,0,0,1);
+        }
+        
+        #room-modal h2 { font-size: 1rem; text-shadow: 2px 2px #000; }
+        #room-modal p { font-weight: bold; color: #fff; font-size: 0.9rem; }
+
+        input { 
+            background: #111; 
+            border: 2px solid var(--neon-green); 
+            color: #fff; 
+            padding: 12px; 
+            margin: 10px 0; 
+            width: 85%; 
+            text-align: center; 
+            font-size: 1.2rem; 
+            font-weight: bold;
+        }
+        
+        .btn { 
+            background: var(--neon-pink); 
+            color: white; 
+            border: none; 
+            padding: 15px; 
+            font-family: 'Press Start 2P', cursive; 
+            cursor: pointer; 
+            font-size: 0.7rem; 
+            width: 100%; 
+            margin-top: 10px; 
+            text-shadow: 2px 2px #000;
+        }
+
+        footer { position: fixed; bottom: 15px; right: 15px; z-index: 1001; }
+        .frutilla { font-size: 30px; cursor: pointer; filter: drop-shadow(0 0 5px red); transition: transform 0.2s; user-select: none; }
     </style>
 </head>
 <body>
@@ -98,7 +152,6 @@
             <div class="game-card" onclick="openModal('CARRERA 2D')">CARRERA 2D</div>
             <div class="game-card" onclick="openModal('TETRIX')">TETRIX</div>
             <div class="game-card" onclick="openModal('TIRO')">TIRO AL BLANCO</div>
-            <!-- Nuevo Juego Agregado -->
             <div class="game-card" onclick="openModal('LABERINTO')">LABERINTO NEÓN</div>
         </div>
     </div>
@@ -106,14 +159,15 @@
     <div id="game-container"></div>
 
     <div id="room-modal">
-        <h2 id="selected-game-title" style="font-family: 'Press Start 2P'; font-size: 0.8rem; color: var(--neon-pink);">JUEGO</h2>
+        <h2 id="selected-game-title" style="font-family: 'Press Start 2P'; color: var(--neon-pink);">JUEGO</h2>
         <button class="btn" onclick="generateRoom()">CREAR SALA</button>
-        <div id="room-info" style="margin-top:10px; color:#fff; font-size:0.8rem;"></div>
-        <hr style="border: 0; border-top: 1px solid #333; margin: 15px 0;">
+        <div id="room-info" style="margin-top:15px; color:#39FF14; font-size:0.9rem; font-weight: bold; background: #111; padding: 5px;"></div>
+        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+        <p>UNIRSE A PARTIDA</p>
         <input type="number" id="room-id" placeholder="ID SALA">
         <input type="text" id="room-pass" placeholder="PASS" value="123">
         <button class="btn" onclick="joinRoom()">UNIRSE</button>
-        <p onclick="closeModal()" style="cursor:pointer; font-size: 0.6rem; margin-top: 20px; color: #555;">[ CANCELAR ]</p>
+        <p onclick="closeModal()" style="cursor:pointer; font-size: 0.7rem; margin-top: 25px; color: #aaa; font-family: 'Press Start 2P';">[ CANCELAR ]</p>
     </div>
 
     <footer>
@@ -147,7 +201,7 @@
 
         socket.on('room_created', (data) => {
             idSalaActual = data.roomId;
-            document.getElementById('room-info').innerHTML = `SALA: ${data.roomId}<br>Esperando rival...`;
+            document.getElementById('room-info').innerHTML = `SALA: ${data.roomId}<br>PASS: ${data.password}`;
         });
 
         socket.on('player_joined', (data) => {
