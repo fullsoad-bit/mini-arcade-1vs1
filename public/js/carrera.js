@@ -3,13 +3,12 @@ const ctxRacing = canvasRacing.getContext('2d');
 canvasRacing.width = 400; canvasRacing.height = 600;
 canvasRacing.style.cssText = "background:#000; border:4px solid #FF00FF; display:block; margin:auto; max-width:95vw; height:auto; touch-action:none;";
 
-let racingRoomId = null;
-let racingRole = "spectator";
+let racingRoomId = "";
+let racingRole = "";
 let isRacingActive = false;
 let obstacles = [];
 let carHost = { x: 100, y: 480, color: "#39FF14", stun: 0, crashes: 0 };
 let carGuest = { x: 260, y: 480, color: "#FF00FF", stun: 0, crashes: 0 };
-let timerInt, obsInt;
 
 function startRacing(roomId, isHost) {
     racingRoomId = roomId.toString();
@@ -24,15 +23,14 @@ function startRacing(roomId, isHost) {
     if (/Android|iPhone/i.test(navigator.userAgent)) setupMobileControls(container);
 
     if (isHost) {
-        obsInt = setInterval(() => {
+        setInterval(() => {
             if(isRacingActive) obstacles.push({ x: Math.random() * 320 + 20, y: -50 });
-        }, 900);
+        }, 950);
     }
     renderRacing();
 }
 
-// ÚNICO ESCUCHADOR DE SINCRONIZACIÓN
-socket.off('sync'); // Evitar duplicados
+// ÚNICO ESCUCHADOR DE RED
 socket.on('sync', (data) => {
     if (!isRacingActive) return;
     if (data.type === 'move') {
@@ -52,8 +50,9 @@ function movePlayer(dir) {
     if (!isRacingActive) return;
     let my = (racingRole === 'host') ? carHost : carGuest;
     if (my.stun > 0) return;
-    if (dir === "left" && my.x > 20) my.x -= 25;
-    if (dir === "right" && my.x < 340) my.x += 25;
+    if (dir === "left" && my.x > 20) my.x -= 30;
+    if (dir === "right" && my.x < 340) my.x += 30;
+    
     socket.emit('sync', { roomId: racingRoomId, type: 'move', x: my.x, role: racingRole });
 }
 
@@ -78,6 +77,12 @@ function renderRacing() {
     });
 
     drawCar(carHost); drawCar(carGuest);
+    
+    // HUD
+    ctxRacing.fillStyle = "white";
+    ctxRacing.font = "12px Arial";
+    ctxRacing.fillText(`YO: ${racingRole === 'host' ? carHost.crashes : carGuest.crashes} | RIVAL: ${racingRole === 'host' ? carGuest.crashes : carHost.crashes}`, 10, 20);
+
     requestAnimationFrame(renderRacing);
 }
 
@@ -89,10 +94,10 @@ function drawCar(c) {
 
 function setupMobileControls(cont) {
     const box = document.createElement('div');
-    box.style.cssText = "display:flex; justify-content:center; gap:20px; padding:20px;";
-    const bStyle = "width:80px; height:80px; font-size:30px; background:#222; border:2px solid #FF00FF; color:#fff; border-radius:15px;";
-    const bl = document.createElement('button'); bl.innerText = "◀️"; bl.style.cssText = bStyle;
-    const br = document.createElement('button'); br.innerText = "▶️"; br.style.cssText = bStyle;
+    box.style.cssText = "display:flex; justify-content:center; gap:25px; padding:20px;";
+    const btn = "width:85px; height:85px; font-size:35px; background:#222; color:#fff; border:3px solid #FF00FF; border-radius:20px;";
+    const bl = document.createElement('button'); bl.innerText = "◀️"; bl.style.cssText = btn;
+    const br = document.createElement('button'); br.innerText = "▶️"; br.style.cssText = btn;
     bl.ontouchstart = (e) => { e.preventDefault(); movePlayer("left"); };
     br.ontouchstart = (e) => { e.preventDefault(); movePlayer("right"); };
     box.appendChild(bl); box.appendChild(br);
