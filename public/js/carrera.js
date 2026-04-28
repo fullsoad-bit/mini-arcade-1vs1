@@ -1,3 +1,4 @@
+// carrera.js - VERSIÓN DEFINITIVA
 const canvasRacing = document.createElement('canvas');
 const ctxRacing = canvasRacing.getContext('2d');
 canvasRacing.width = 400; canvasRacing.height = 600;
@@ -20,25 +21,26 @@ function startRacing(roomId, isHost) {
     container.innerHTML = "";
     container.appendChild(canvasRacing);
 
-    if (/Android|iPhone/i.test(navigator.userAgent)) setupMobileControls(container);
+    setupMobileControls(container);
 
     if (isHost) {
         setInterval(() => {
             if(isRacingActive) obstacles.push({ x: Math.random() * 320 + 20, y: -50 });
-        }, 950);
+        }, 900);
     }
     renderRacing();
 }
 
-// ÚNICO ESCUCHADOR DE RED
+// ESCUCHADOR DE RED ÚNICO
 socket.on('sync', (data) => {
     if (!isRacingActive) return;
+    
     if (data.type === 'move') {
         if (data.role === 'host') carHost.x = data.x;
         else carGuest.x = data.x;
     }
     if (data.type === 'obs' && racingRole === 'guest') {
-        obstacles = data.list;
+        obstacles = data.list; // El invitado sobreescribe su lista con la del host
     }
     if (data.type === 'hit') {
         const c = (data.role === 'host') ? carHost : carGuest;
@@ -63,6 +65,7 @@ function renderRacing() {
     if (racingRole === 'host') {
         obstacles.forEach(o => o.y += 6);
         obstacles = obstacles.filter(o => o.y < 650);
+        // El Host envía su lista obligatoriamente cada frame
         socket.emit('sync', { roomId: racingRoomId, type: 'obs', list: obstacles });
     }
 
@@ -77,12 +80,6 @@ function renderRacing() {
     });
 
     drawCar(carHost); drawCar(carGuest);
-    
-    // HUD
-    ctxRacing.fillStyle = "white";
-    ctxRacing.font = "12px Arial";
-    ctxRacing.fillText(`YO: ${racingRole === 'host' ? carHost.crashes : carGuest.crashes} | RIVAL: ${racingRole === 'host' ? carGuest.crashes : carHost.crashes}`, 10, 20);
-
     requestAnimationFrame(renderRacing);
 }
 
@@ -94,12 +91,14 @@ function drawCar(c) {
 
 function setupMobileControls(cont) {
     const box = document.createElement('div');
-    box.style.cssText = "display:flex; justify-content:center; gap:25px; padding:20px;";
-    const btn = "width:85px; height:85px; font-size:35px; background:#222; color:#fff; border:3px solid #FF00FF; border-radius:20px;";
-    const bl = document.createElement('button'); bl.innerText = "◀️"; bl.style.cssText = btn;
-    const br = document.createElement('button'); br.innerText = "▶️"; br.style.cssText = btn;
+    box.style.cssText = "display:flex; justify-content:center; gap:20px; padding:15px;";
+    const btnStyle = "width:80px; height:80px; font-size:30px; background:#222; border:2px solid #FF00FF; color:#fff; border-radius:15px;";
+    const bl = document.createElement('button'); bl.innerText = "◀️"; bl.style.cssText = btnStyle;
+    const br = document.createElement('button'); br.innerText = "▶️"; br.style.cssText = btnStyle;
+    
     bl.ontouchstart = (e) => { e.preventDefault(); movePlayer("left"); };
     br.ontouchstart = (e) => { e.preventDefault(); movePlayer("right"); };
+    
     box.appendChild(bl); box.appendChild(br);
     cont.appendChild(box);
 }
