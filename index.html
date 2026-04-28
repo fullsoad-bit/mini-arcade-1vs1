@@ -13,11 +13,11 @@
         const socket = io(); 
     </script>
 
-    <script src="/js/pingpong.js?v=final_dexter"></script>
-    <script src="/js/carrera.js?v=final_dexter"></script>
-    <script src="/js/tetrix.js?v=final_dexter"></script>
-    <script src="/js/tiro.js?v=final_dexter"></script>
-    <script src="/js/laberinto.js?v=final_dexter"></script>
+    <script src="/js/pingpong.js?v=dexter_v3"></script>
+    <script src="/js/carrera.js?v=dexter_v3"></script>
+    <script src="/js/tetrix.js?v=dexter_v3"></script>
+    <script src="/js/tiro.js?v=dexter_v3"></script>
+    <script src="/js/laberinto.js?v=dexter_v3"></script>
     
     <style>
         :root { --neon-green: #39FF14; --neon-pink: #FF00FF; --bg-color: #0d0208; }
@@ -31,96 +31,88 @@
             flex-direction: column; 
             align-items: center; 
             min-height: 100vh; 
-            overflow-x: hidden; 
             touch-action: manipulation; 
         }
 
-        #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; padding-bottom: 80px; }
-        #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; position: relative; }
+        #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; padding-bottom: 100px; }
+        #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; }
 
-        /* Efecto Monitor CRT ajustado para no oscurecer tanto */
-        body::before {
-            content: " ";
-            display: block;
-            position: fixed;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
-            z-index: 1000;
-            background-size: 100% 3px, 3px 100%;
-            pointer-events: none;
-        }
-
-        /* Título más grande y legible */
+        /* Título Principal Gigante */
         h1 { 
             font-family: 'Press Start 2P', cursive; 
-            font-size: 1.7rem; 
+            font-size: 2.2rem; /* Aumentado */
             color: var(--neon-pink); 
-            margin-top: 40px; 
-            margin-bottom: 5px; 
-            text-shadow: 3px 3px 0px #000; /* Sombra sólida para legibilidad */
+            margin-top: 50px; 
+            margin-bottom: 10px; 
+            text-shadow: 4px 4px 0px #000; 
             text-align: center; 
         }
         
-        /* Subtítulo con fondo oscuro para resaltar */
+        /* Subtítulo Dexter Legible */
         .subtitle { 
             font-family: 'Press Start 2P', cursive; 
-            font-size: 0.65rem; 
+            font-size: 0.8rem; /* Aumentado */
             color: #fff; 
-            margin-bottom: 30px; 
-            letter-spacing: 1px;
-            background: rgba(0,0,0,0.5);
-            padding: 5px 10px;
+            margin-bottom: 40px; 
+            background: rgba(0,0,0,0.7);
+            padding: 8px 15px;
+            border: 1px solid var(--neon-pink);
             border-radius: 5px;
         }
 
-        .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; width: 92%; max-width: 800px; }
+        /* Cuadrícula de juegos */
+        .game-grid { 
+            display: grid; 
+            grid-template-columns: 1fr; /* Una columna en móvil para que sean botones anchos */
+            gap: 20px; 
+            width: 90%; 
+            max-width: 500px; 
+        }
         
-        /* Cartas con texto más claro */
+        /* Botones de Juego (Cartas) mucho más grandes */
         .game-card { 
             font-family: 'Press Start 2P', cursive; 
-            border: 3px solid var(--neon-green); 
-            padding: 18px 10px; 
+            border: 4px solid var(--neon-green); 
+            padding: 25px 10px; /* Más alto */
             text-align: center; 
             cursor: pointer; 
-            background: rgba(0, 0, 0, 0.8); /* Fondo más oscuro para que la letra verde resalte */
+            background: #000; /* Fondo negro puro para contraste máximo */
             transition: 0.2s; 
-            font-size: 0.7rem; /* Un poco más grande */
+            font-size: 1rem; /* Letra mucho más grande */
             font-weight: bold;
             color: var(--neon-green);
-            text-shadow: 2px 2px 2px #000;
+            text-shadow: 2px 2px 0px #000;
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
         }
 
         .game-card:hover { background-color: var(--neon-green); color: black; text-shadow: none; }
 
-        /* Modal más legible */
+        /* Modal con textos grandes */
         #room-modal { 
             display: none; 
             position: fixed; 
             top: 50%; left: 50%; 
             transform: translate(-50%, -50%); 
             background: #000; 
-            border: 4px solid var(--neon-pink); 
-            padding: 25px; 
+            border: 5px solid var(--neon-pink); 
+            padding: 30px; 
             z-index: 2000; 
-            text-align: center; 
-            width: 85%; 
-            max-width: 350px; 
-            box-shadow: 0 0 30px rgba(0,0,0,1);
+            width: 90%; 
+            max-width: 400px; 
         }
         
-        #room-modal h2 { font-size: 1rem; text-shadow: 2px 2px #000; }
-        #room-modal p { font-weight: bold; color: #fff; font-size: 0.9rem; }
+        #room-modal h2 { font-size: 1.4rem; margin-bottom: 20px; }
+        #room-modal p { font-size: 1.1rem; color: #fff; font-weight: bold; margin: 15px 0; }
 
         input { 
             background: #111; 
-            border: 2px solid var(--neon-green); 
+            border: 3px solid var(--neon-green); 
             color: #fff; 
-            padding: 12px; 
+            padding: 15px; 
             margin: 10px 0; 
             width: 85%; 
             text-align: center; 
-            font-size: 1.2rem; 
+            font-size: 1.5rem; /* Números de ID gigantes */
             font-weight: bold;
         }
         
@@ -128,17 +120,17 @@
             background: var(--neon-pink); 
             color: white; 
             border: none; 
-            padding: 15px; 
+            padding: 20px; 
             font-family: 'Press Start 2P', cursive; 
             cursor: pointer; 
-            font-size: 0.7rem; 
+            font-size: 1rem; /* Texto de botones grande */
             width: 100%; 
-            margin-top: 10px; 
+            margin-top: 15px; 
             text-shadow: 2px 2px #000;
         }
 
-        footer { position: fixed; bottom: 15px; right: 15px; z-index: 1001; }
-        .frutilla { font-size: 30px; cursor: pointer; filter: drop-shadow(0 0 5px red); transition: transform 0.2s; user-select: none; }
+        footer { position: fixed; bottom: 20px; right: 20px; z-index: 1001; }
+        .frutilla { font-size: 45px; filter: drop-shadow(0 0 10px red); cursor: pointer; }
     </style>
 </head>
 <body>
@@ -161,17 +153,17 @@
     <div id="room-modal">
         <h2 id="selected-game-title" style="font-family: 'Press Start 2P'; color: var(--neon-pink);">JUEGO</h2>
         <button class="btn" onclick="generateRoom()">CREAR SALA</button>
-        <div id="room-info" style="margin-top:15px; color:#39FF14; font-size:0.9rem; font-weight: bold; background: #111; padding: 5px;"></div>
-        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+        <div id="room-info" style="margin-top:20px; color:#39FF14; font-size:1.2rem; font-weight: bold; background: #111; padding: 10px; border: 1px dashed var(--neon-green);"></div>
+        <hr style="border: 0; border-top: 2px solid #333; margin: 25px 0;">
         <p>UNIRSE A PARTIDA</p>
         <input type="number" id="room-id" placeholder="ID SALA">
         <input type="text" id="room-pass" placeholder="PASS" value="123">
         <button class="btn" onclick="joinRoom()">UNIRSE</button>
-        <p onclick="closeModal()" style="cursor:pointer; font-size: 0.7rem; margin-top: 25px; color: #aaa; font-family: 'Press Start 2P';">[ CANCELAR ]</p>
+        <p onclick="closeModal()" style="cursor:pointer; font-size: 0.9rem; margin-top: 30px; color: #ff4d4d; font-family: 'Press Start 2P';">[ CANCELAR ]</p>
     </div>
 
     <footer>
-        <div class="frutilla" onclick="alert('¡Gracias por jugar con nuestra página!')" title="Dexter Easter Egg">🍓</div>
+        <div class="frutilla" onclick="alert('¡Gracias por jugar con nuestra página!')">🍓</div>
     </footer>
 
     <script>
