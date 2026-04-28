@@ -4,6 +4,7 @@ const http = require('http').Server(app);
 const io = require('socket.io')(http);
 const path = require('path');
 
+// Servir archivos estáticos
 app.use(express.static(__dirname));
 app.use('/js', express.static(path.join(__dirname, 'public/js')));
 
@@ -12,6 +13,7 @@ const rooms = {};
 io.on('connection', (socket) => {
     console.log('🔌 Conectado:', socket.id);
 
+    // Gestión de Salas
     socket.on('create_room', (data) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
         rooms[roomId] = { password: data.password, game: data.game, players: [socket.id] };
@@ -25,25 +27,24 @@ io.on('connection', (socket) => {
             if (room.players.length < 2) {
                 socket.join(data.roomId);
                 if (!room.players.includes(socket.id)) room.players.push(socket.id);
-                // Notificar a todos los miembros de la sala
+                // Notificar inicio a ambos
                 io.to(data.roomId).emit('player_joined', { roomId: data.roomId, game: room.game });
             } else {
                 socket.emit('error_msg', 'Sala llena');
             }
         } else {
-            socket.emit('error_msg', 'ID o Pass incorrectos');
+            socket.emit('error_msg', 'ID o Password incorrectos');
         }
     });
 
-    // REPETIDOR UNIVERSAL DE EVENTOS (Soluciona el problema de los obstáculos)
-    socket.on('game_event', (data) => {
+    // PUENTE DE DATOS MAESTRO (Soluciona el problema de los obstáculos)
+    socket.on('broadcast', (data) => {
         if (data.roomId) {
-            // io.to envía a TODOS en la sala, incluyendo al que envía si es necesario, 
-            // pero el código del cliente filtrará para no duplicar.
-            socket.to(data.roomId).emit('opponent_event', data);
+            socket.to(data.roomId).emit('broadcast', data);
         }
     });
 
+    // Movimiento de jugadores
     socket.on('player_move', (data) => {
         if (data.roomId) {
             socket.to(data.roomId).emit('opponent_move', data);
@@ -55,7 +56,7 @@ io.on('connection', (socket) => {
             if (rooms[roomId]) {
                 rooms[roomId].players = rooms[roomId].players.filter(id => id !== socket.id);
                 if (rooms[roomId].players.length === 0) delete rooms[roomId];
-                else io.to(roomId).emit('error_msg', 'Oponente desconectado');
+                else io.to(roomId).emit('error_msg', 'Rival desconectado');
             }
         });
     });
@@ -63,5 +64,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SERVIDOR ARCADE LISTO EN PUERTO ${PORT}`);
+    console.log(`🚀 SERVIDOR ARCADE EN PUERTO ${PORT}`);
 });
