@@ -25,7 +25,7 @@ io.on('connection', (socket) => {
             socket.join(data.roomId);
             if (!room.players.includes(socket.id)) room.players.push(socket.id);
             
-            // Emitir a TODA la sala para que el Jugador 1 y el Jugador 2 inicien al mismo tiempo
+            // Notificar a todos en la sala que la partida comienza
             io.to(data.roomId).emit('player_joined', { 
                 roomId: data.roomId, 
                 game: room.game 
@@ -35,13 +35,14 @@ io.on('connection', (socket) => {
         }
     });
 
-    // RETRANSMISOR UNIVERSAL
+    // TRANSMISOR DE OBSTÁCULOS Y EVENTOS
     socket.on('broadcast', (data) => {
         if (data.roomId) {
             socket.to(data.roomId).emit('broadcast', data);
         }
     });
 
+    // TRANSMISOR DE MOVIMIENTO
     socket.on('player_move', (data) => {
         if (data.roomId) {
             socket.to(data.roomId).emit('opponent_move', data);
@@ -60,5 +61,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SERVIDOR ARCADE ONLINE EN PUERTO ${PORT}`);
+    console.log(`🚀 SERVIDOR OK EN PUERTO ${PORT}`);
 });
