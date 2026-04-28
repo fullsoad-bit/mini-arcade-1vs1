@@ -5,9 +5,7 @@ const io = require('socket.io')(http);
 const path = require('path');
 
 // --- CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS ---
-// Sirve el index.html desde la raíz
 app.use(express.static(__dirname));
-// Sirve los juegos desde la carpeta public/js
 app.use('/js', express.static(path.join(__dirname, 'public/js')));
 
 // Almacén de salas en memoria
@@ -34,17 +32,19 @@ io.on('connection', (socket) => {
         const room = rooms[data.roomId];
         if (room && room.password === data.password) {
             if (room.players.length < 2) {
-                if (!room.players.includes(socket.id)) room.players.push(socket.id);
+                // Unirse a la sala de Socket.io inmediatamente
                 socket.join(data.roomId);
                 
-                // Delay para asegurar que el socket esté unido a la sala de Socket.io
-                setTimeout(() => {
-                    io.to(data.roomId).emit('player_joined', { 
-                        roomId: data.roomId, 
-                        game: room.game 
-                    });
-                }, 200);
+                if (!room.players.includes(socket.id)) room.players.push(socket.id);
+                
                 console.log(`🎮 Jugador unido a sala ${data.roomId}`);
+
+                // Notificar a AMBOS jugadores que la partida comienza
+                // Usamos io.to().emit para asegurar que todos reciban la señal de inicio
+                io.to(data.roomId).emit('player_joined', { 
+                    roomId: data.roomId, 
+                    game: room.game 
+                });
             } else {
                 socket.emit('error_msg', 'La sala está llena');
             }
@@ -57,38 +57,40 @@ io.on('connection', (socket) => {
 
     // 1. Movimiento (Paddles, Autos, Mira, Tetris)
     socket.on('player_move', (data) => {
-        // Reenvía a todos en la sala excepto al emisor
-        socket.to(data.roomId).emit('opponent_move', data);
+        if (data.roomId) {
+            socket.to(data.roomId).emit('opponent_move', data);
+        }
     });
 
-    // 2. Ping Pong: Sincronización de la pelota (Host -> Guest)
+    // 2. Carrera 2D y Eventos Generales (Sincronización de Obstáculos, Choques, Stun)
+    // Este bloque es vital para el archivo carrera.js que te pasé
+    socket.on('game_event', (data) => {
+        if (data.roomId) {
+            // Reenvía absolutamente todo (sync_obstacles, stun, etc.) al oponente
+            socket.to(data.roomId).emit('opponent_event', data);
+        }
+    });
+
+    // 3. Otros eventos específicos (Mantenidos por compatibilidad con tus otros juegos)
     socket.on('ball_sync', (data) => {
-        socket.to(data.roomId).emit('ball_update', data);
+        if (data.roomId) socket.to(data.roomId).emit('ball_update', data);
     });
 
-    // 3. Carrera 2D: Obstáculos generados por el Host
     socket.on('spawn_obstacle', (data) => {
-        socket.to(data.roomId).emit('new_obstacle', data);
+        if (data.roomId) socket.to(data.roomId).emit('new_obstacle', data);
     });
 
-    // 4. Tetris y Tiro: Puntajes y Viento
     socket.on('tetrix_sync', (data) => {
-        socket.to(data.roomId).emit('tetrix_update', data);
+        if (data.roomId) socket.to(data.roomId).emit('tetrix_update', data);
     });
 
     socket.on('target_sync', (data) => {
-        socket.to(data.roomId).emit('target_update', data);
-    });
-
-    // 5. Eventos especiales (Choques, Stun, Explosiones)
-    socket.on('game_event', (data) => {
-        socket.to(data.roomId).emit('opponent_event', data);
+        if (data.roomId) socket.to(data.roomId).emit('target_update', data);
     });
 
     // --- LIMPIEZA ---
 
     socket.on('disconnecting', () => {
-        // Al desconectarse, avisar a las salas y limpiar
         socket.rooms.forEach(roomId => {
             if (rooms[roomId]) {
                 rooms[roomId].players = rooms[roomId].players.filter(id => id !== socket.id);
@@ -96,7 +98,7 @@ io.on('connection', (socket) => {
                     delete rooms[roomId];
                     console.log(`🗑️ Sala ${roomId} eliminada.`);
                 } else {
-                    socket.to(roomId).emit('error_msg', 'El oponente se ha desconectado.');
+                    io.to(roomId).emit('error_msg', 'El oponente se ha desconectado.');
                 }
             }
         });
