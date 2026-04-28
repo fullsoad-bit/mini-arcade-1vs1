@@ -3,11 +3,11 @@ const ctxT = canvasT.getContext('2d');
 
 const ROW = 20;
 const COL = 10;
-const SQ = 25; // Tamaño reducido para que quepa en celulares
+const SQ = 25; 
 canvasT.width = COL * SQ;
 canvasT.height = ROW * SQ;
 
-canvasT.style.cssText = "background:#0d0208; border:4px solid #FF00FF; display:block; margin:5px auto; max-width:90vw; height:auto; touch-action:none; box-shadow: 0 0 15px #FF00FF55;";
+canvasT.style.cssText = "background:#0d0208; border:4px solid #FF00FF; display:block; margin:5px auto; max-width:85vw; height:auto; touch-action:none;";
 
 const VACANTE = "#0d0208"; 
 
@@ -19,6 +19,17 @@ let myScore = 0;
 let opponentScore = 0;
 let tetrixTimeLeft = 180;
 let tetrixGameInterval, tetrixTimerInterval;
+
+// --- PIEZAS REALES RE-ESTABLECIDAS ---
+const PIECES = [
+    [ [[1,1,1,1]], "#00f0f0" ], // I
+    [ [[1,1,1],[0,1,0]], "#a000f0" ], // T
+    [ [[1,1,0],[0,1,1]], "#f00000" ], // Z
+    [ [[0,1,1],[1,1,0]], "#00f000" ], // S
+    [ [[1,1],[1,1]], "#f0f000" ], // O
+    [ [[1,1,1],[1,0,0]], "#f0a000" ], // L
+    [ [[1,1,1],[0,0,1]], "#0000f0" ]  // J
+];
 
 let board = [];
 function initBoard() {
@@ -42,16 +53,6 @@ function drawBoard() {
         }
     }
 }
-
-const PIECES = [
-    [ [[1,1,1,1]], "#00f0f0" ],
-    [ [[1,1,1],[0,1,0]], "#a000f0" ],
-    [ [[1,1,0],[0,1,1]], "#f00000" ],
-    [ [[0,1,1],[1,1,0]], "#00f000" ],
-    [ [[1,1],[1,1]], "#f0f000" ],
-    [ [[1,1,1],[1,0,0]], "#f0a000" ],
-    [ [[1,1,1],[0,0,1]], "#0000f0" ]
-];
 
 function randomPiece() {
     let r = Math.floor(Math.random() * PIECES.length);
@@ -94,7 +95,7 @@ function lockPiece() {
         for (let c = 0; c < piece.shape[r].length; c++) {
             if (!piece.shape[r][c]) continue;
             if (piece.y + r < 0) {
-                myScore = Math.max(0, myScore - 200);
+                myScore = Math.max(0, myScore - 100);
                 initBoard();
                 syncTetrix();
                 return;
@@ -121,12 +122,12 @@ function checkLines() {
 }
 
 function syncTetrix() {
-    if (tetrixRoomId && typeof socket !== 'undefined') {
+    if (tetrixRoomId && socket) {
         socket.emit('sync', { 
             roomId: tetrixRoomId, 
             type: 'tetrix_score',
             score: myScore,
-            timeLeft: tetrixTimeLeft // El Host manda el tiempo oficial
+            timeLeft: tetrixTimeLeft 
         });
     }
 }
@@ -136,34 +137,31 @@ function renderTetrix() {
     ctxT.fillStyle = VACANTE;
     ctxT.fillRect(0, 0, canvasT.width, canvasT.height);
     drawBoard();
+    
     for (let r = 0; r < piece.shape.length; r++) {
         for (let c = 0; c < piece.shape[r].length; c++) {
             if (piece.shape[r][c]) drawSquare(piece.x + c, piece.y + r, piece.color);
         }
     }
-    // HUD Flotante
-    ctxT.fillStyle = "rgba(0,0,0,0.7)";
+
+    // HUD
+    ctxT.fillStyle = "rgba(0,0,0,0.8)";
     ctxT.fillRect(0, 0, canvasT.width, 40);
     ctxT.fillStyle = "white";
-    ctxT.font = "10px Monospace";
+    ctxT.font = "bold 10px Arial";
     ctxT.fillText(`⏱️${tetrixTimeLeft}s | YO:${myScore} | RIVAL:${opponentScore}`, 5, 25);
+    
     requestAnimationFrame(renderTetrix);
 }
 
-// Escuchar actualizaciones del oponente
-socket.on('sync', (data) => {
-    if (data.type === 'tetrix_score') {
-        opponentScore = data.score;
-        if (tetrixRole === 'guest') tetrixTimeLeft = data.timeLeft;
-    }
-});
-
-function endTetrix() {
-    isTetrixActive = false;
-    clearInterval(tetrixGameInterval);
-    clearInterval(tetrixTimerInterval);
-    alert(`FIN! Score: ${myScore} | Rival: ${opponentScore}`);
-    window.location.reload();
+// Escuchar Red
+if (typeof socket !== 'undefined') {
+    socket.on('sync', (data) => {
+        if (data.type === 'tetrix_score') {
+            opponentScore = data.score;
+            if (tetrixRole === 'guest') tetrixTimeLeft = data.timeLeft;
+        }
+    });
 }
 
 function startTetrix(roomId, isHost) {
@@ -171,19 +169,20 @@ function startTetrix(roomId, isHost) {
     tetrixRole = isHost ? 'host' : 'guest';
     isTetrixActive = true;
     initBoard();
-    myScore = 0;
-    opponentScore = 0;
-    tetrixTimeLeft = 180;
+    myScore = 0; opponentScore = 0; tetrixTimeLeft = 180;
 
     const container = document.getElementById('game-container');
     container.innerHTML = ""; 
     container.appendChild(canvasT);
 
+    // Forzamos la creación de controles para asegurar visibilidad
     setupMobileTetrixControls(container);
 
-    tetrixGameInterval = setInterval(moveDown, 700);
+    if (tetrixGameInterval) clearInterval(tetrixGameInterval);
+    tetrixGameInterval = setInterval(moveDown, 800);
     
     if (isHost) {
+        if (tetrixTimerInterval) clearInterval(tetrixTimerInterval);
         tetrixTimerInterval = setInterval(() => {
             if (tetrixTimeLeft > 0) {
                 tetrixTimeLeft--;
@@ -191,33 +190,44 @@ function startTetrix(roomId, isHost) {
             } else endTetrix();
         }, 1000);
     }
-
     renderTetrix();
 }
 
 function setupMobileTetrixControls(cont) {
-    if (!/Android|iPhone/i.test(navigator.userAgent)) return;
+    const controlsDiv = document.createElement('div');
+    controlsDiv.style.cssText = "display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; width:95%; margin:15px auto; padding-bottom: 20px;";
     
-    const d = document.createElement('div');
-    d.style.cssText = "display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; width:90%; margin:10px auto;";
+    const btnStyle = "height:70px; background:#222; border:2px solid #FF00FF; color:white; font-size:25px; border-radius:12px; touch-action:none; display:flex; align-items:center; justify-content:center; user-select:none;";
     
-    const bS = "height:60px; background:#222; border:2px solid #FF00FF; color:white; font-size:20px; border-radius:10px;";
-    
-    const btnL = document.createElement('button'); btnL.innerHTML = "◀️"; btnL.style.cssText = bS;
-    const btnR = document.createElement('button'); btnR.innerHTML = "▶️"; btnR.style.cssText = bS;
-    const btnU = document.createElement('button'); btnU.innerHTML = "🔄"; btnU.style.cssText = bS;
-    const btnD = document.createElement('button'); btnD.innerHTML = "🔽"; btnD.style.cssText = bS;
+    const btnL = document.createElement('div'); btnL.innerHTML = "◀️"; btnL.style.cssText = btnStyle;
+    const btnR = document.createElement('div'); btnR.innerHTML = "▶️"; btnR.style.cssText = btnStyle;
+    const btnU = document.createElement('div'); btnU.innerHTML = "🔄"; btnU.style.cssText = btnStyle;
+    const btnD = document.createElement('div'); btnD.innerHTML = "🔽"; btnD.style.cssText = btnStyle;
 
+    // Eventos Touch
     btnL.ontouchstart = (e) => { e.preventDefault(); if (!collision(-1, 0, piece.shape)) piece.x--; };
     btnR.ontouchstart = (e) => { e.preventDefault(); if (!collision(1, 0, piece.shape)) piece.x++; };
     btnU.ontouchstart = (e) => { e.preventDefault(); rotatePiece(); };
     btnD.ontouchstart = (e) => { e.preventDefault(); moveDown(); };
 
-    // Layout del D-PAD
-    d.appendChild(document.createElement('div')); d.appendChild(btnU); d.appendChild(document.createElement('div'));
-    d.appendChild(btnL); d.appendChild(btnD); d.appendChild(btnR);
+    // Layout
+    controlsDiv.appendChild(document.createElement('div')); 
+    controlsDiv.appendChild(btnU); 
+    controlsDiv.appendChild(document.createElement('div'));
     
-    cont.appendChild(d);
+    controlsDiv.appendChild(btnL); 
+    controlsDiv.appendChild(btnD); 
+    controlsDiv.appendChild(btnR);
+    
+    cont.appendChild(controlsDiv);
+}
+
+function endTetrix() {
+    isTetrixActive = false;
+    clearInterval(tetrixGameInterval);
+    clearInterval(tetrixTimerInterval);
+    alert(`TIEMPO TERMINADO\nTu puntuación: ${myScore}\nRival: ${opponentScore}`);
+    window.location.reload();
 }
 
 window.addEventListener("keydown", (e) => {
