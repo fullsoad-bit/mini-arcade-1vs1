@@ -37,7 +37,6 @@ function runSpace() {
     let my = (spRole === 'host') ? spP1 : spP2;
     let rival = (spRole === 'host') ? spP2 : spP1;
 
-    // MOVIMIENTO MEJORADO
     if (spJoy.active) { 
         my.x += spJoy.dx * 8; 
         my.x = Math.max(25, Math.min(375, my.x)); 
@@ -46,8 +45,10 @@ function runSpace() {
     my.b.forEach((bul, i) => {
         bul.y += (spRole === 'host') ? -12 : 12;
         if (bul.y < 0 || bul.y > 600) my.b.splice(i, 1);
+        
+        // CORRECCIÓN: 20 de daño = 5 disparos para morir
         if (Math.abs(bul.x - rival.x) < 25 && Math.abs(bul.y - rival.y) < 25) {
-            if (spRole === 'host') spP2.hp -= 5; else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_p1'});
+            if (spRole === 'host') spP2.hp -= 20; else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_p1'});
             my.b.splice(i, 1);
         }
         if (spBoss.active && Math.abs(bul.x - spBoss.x) < 40 && Math.abs(bul.y - spBoss.y) < 40) {
@@ -59,6 +60,8 @@ function runSpace() {
     if (spRole === 'host') {
         spTimer += 0.03;
         if (spTimer > 45 && !spBoss.active) spBoss.active = true;
+        
+        // Lógica del Boss
         if (spBoss.active && spBoss.hp > 0) {
             if (spBoss.y < 250) spBoss.y += 1.5;
             spBoss.x = 200 + Math.sin(spTimer) * 100;
@@ -71,12 +74,30 @@ function runSpace() {
             if (bb.x < 0 || bb.x > 400 || bb.y < 0 || bb.y > 600) spBoss.b.splice(i, 1);
             [spP1, spP2].forEach(p => { if (Math.abs(bb.x - p.x) < 20 && Math.abs(bb.y - p.y) < 20) { p.hp -= 4; spBoss.b.splice(i, 1); } });
         });
-        if (Math.random() < 0.04) spMeteors.push({ x: Math.random()*400, y: 0, s: Math.random()*3+2 });
+
+        // CORRECCIÓN: Meteoritos desde el medio (Y=300) hacia ambos lados
+        if (Math.random() < 0.04) {
+            spMeteors.push({ 
+                x: Math.random()*400, 
+                y: 300, 
+                s: (Math.random() > 0.5 ? 1 : -1) * (Math.random()*3+2) 
+            });
+        }
         spMeteors.forEach((m, i) => {
-            m.y += m.s; if (m.y > 600) spMeteors.splice(i, 1);
-            [spP1, spP2].forEach(p => { if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { p.hp -= 3; spMeteors.splice(i, 1); } });
+            m.y += m.s; 
+            if (m.y > 600 || m.y < 0) spMeteors.splice(i, 1);
+            [spP1, spP2].forEach(p => { 
+                if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { 
+                    p.hp -= 10; // Meteorito quita media vida de un disparo
+                    spMeteors.splice(i, 1); 
+                } 
+            });
         });
-        if (spP1.hp <= 0 || spP2.hp <= 0 || (spBoss.active && spBoss.hp <= 0)) { spActive = false; setTimeout(() => { alert("COMBATE FINALIZADO"); window.location.reload(); }, 200); }
+
+        if (spP1.hp <= 0 || spP2.hp <= 0 || (spBoss.active && spBoss.hp <= 0)) { 
+            spActive = false; 
+            setTimeout(() => { alert("COMBATE FINALIZADO"); window.location.reload(); }, 200); 
+        }
     }
     socket.emit('sync', { roomId: spRoomId, type: 'sp_sync', px: my.x, pb: my.b, met: spMeteors, p1h: spP1.hp, p2h: spP2.hp, bos: spBoss, tm: spTimer });
     drawSp();
@@ -86,45 +107,26 @@ function drawSp() {
     spCtx.fillStyle = (spTimer > 40 && spTimer < 45 && Math.floor(spTimer*5)%2==0) ? "#400" : "#00050a";
     spCtx.fillRect(0, 0, 400, 600);
     
+    // Meteoros
     spMeteors.forEach(m => { spCtx.fillStyle = "#555"; spCtx.beginPath(); spCtx.arc(m.x, m.y, 14, 0, Math.PI*2); spCtx.fill(); });
 
-    // DIBUJAR BOSS (ALIEN VERDE CON TENTÁCULOS)
+    // Boss Alien
     if (spBoss.active && spBoss.hp > 0) {
         spCtx.save();
         spCtx.translate(spBoss.x, spBoss.y);
-        
-        // Tentáculos animados
-        spCtx.strokeStyle = "#2ecc71";
-        spCtx.lineWidth = 4;
+        spCtx.strokeStyle = "#2ecc71"; spCtx.lineWidth = 4;
         for(let i=0; i<5; i++) {
-            spCtx.beginPath();
-            spCtx.moveTo(-20 + i*10, 20);
+            spCtx.beginPath(); spCtx.moveTo(-20 + i*10, 20);
             let offset = Math.sin(spTimer * 5 + i) * 15;
             spCtx.quadraticCurveTo(-20 + i*10 + offset, 40, -20 + i*10, 60);
             spCtx.stroke();
         }
-
-        // Cabeza Alien
-        spCtx.fillStyle = "#39FF14";
-        spCtx.beginPath();
-        spCtx.ellipse(0, 0, 40, 30, 0, 0, Math.PI * 2);
-        spCtx.fill();
-
-        // Ojos
-        spCtx.fillStyle = "black";
-        spCtx.beginPath();
-        spCtx.ellipse(-15, -5, 10, 15, Math.PI/4, 0, Math.PI * 2);
-        spCtx.fill();
-        spCtx.beginPath();
-        spCtx.ellipse(15, -5, 10, 15, -Math.PI/4, 0, Math.PI * 2);
-        spCtx.fill();
-        
+        spCtx.fillStyle = "#39FF14"; spCtx.beginPath(); spCtx.ellipse(0, 0, 40, 30, 0, 0, Math.PI * 2); spCtx.fill();
+        spCtx.fillStyle = "black"; 
+        spCtx.beginPath(); spCtx.ellipse(-15, -5, 10, 15, Math.PI/4, 0, Math.PI * 2); spCtx.fill();
+        spCtx.beginPath(); spCtx.ellipse(15, -5, 10, 15, -Math.PI/4, 0, Math.PI * 2); spCtx.fill();
         spCtx.restore();
-
-        // Barra Vida Boss
-        spCtx.fillStyle = "white";
-        spCtx.fillRect(spBoss.x-40, spBoss.y-50, (spBoss.hp/500)*80, 4);
-
+        spCtx.fillStyle = "white"; spCtx.fillRect(spBoss.x-40, spBoss.y-50, (spBoss.hp/500)*80, 4);
         spBoss.b.forEach(bb => { spCtx.fillStyle = "#ff0"; spCtx.beginPath(); spCtx.arc(bb.x, bb.y, 4, 0, Math.PI*2); spCtx.fill(); });
     }
 
@@ -145,8 +147,6 @@ function drawSp() {
 
 function setupSpControls(cont) {
     const ui = document.createElement('div'); ui.style.cssText = "display:flex; justify-content:space-around; align-items:center; width:100%; margin-top:20px;";
-    
-    // JOYSTICK MEJORADO
     const jBase = document.createElement('div'); 
     jBase.style.cssText = "width:100px; height:100px; background:rgba(0,240,255,0.1); border:3px solid #00f0ff; border-radius:50%; position:relative; touch-action:none;";
     const jStick = document.createElement('div'); 
@@ -178,7 +178,10 @@ function setupSpControls(cont) {
     jBase.appendChild(jStick); ui.appendChild(jBase); ui.appendChild(btnS); cont.appendChild(ui);
 }
 
-// Soporte teclado PC
+socket.on('sync', (data) => {
+    if (spRole === 'host') { if(data.type === 'sp_hit_p1') spP1.hp -= 20; if(data.type === 'sp_hit_boss') spBoss.hp -= 2; }
+});
+
 window.onkeydown = (e) => {
     if (e.key === "ArrowLeft") { spJoy.active = true; spJoy.dx = -1; }
     if (e.key === "ArrowRight") { spJoy.active = true; spJoy.dx = 1; }
@@ -188,3 +191,4 @@ window.onkeydown = (e) => {
     }
 };
 window.onkeyup = () => { spJoy.active = false; spJoy.dx = 0; };
+
