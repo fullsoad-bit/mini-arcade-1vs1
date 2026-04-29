@@ -7,8 +7,7 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
-      gtag('config', 'G-XXXXXXXXXX');
+      gtag('config', 'G-5M67DCZBD6');
     </script>
 
     <meta charset="UTF-8">
@@ -131,20 +130,11 @@
         footer { position: fixed; bottom: 20px; right: 20px; z-index: 5000; }
         .frutilla { font-size: 45px; filter: drop-shadow(0 0 10px red); cursor: pointer; user-select: none; }
 
-        /* --- ESTILOS DEL EASTER EGG (CARAS DE PABLO CORREGIDAS) --- */
         .pablo-head {
-            position: fixed;
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            background-image: url('/pablo.jpg'); 
-            /* Ajuste de encuadre: bajamos el porcentaje para que no se vea solo la frente */
-            background-size: cover;        
-            background-position: center 25%; 
-            background-repeat: no-repeat;
-            border: 3px solid var(--neon-pink);
-            z-index: 9999;
-            cursor: pointer;
+            position: fixed; width: 90px; height: 90px; border-radius: 50%;
+            background-image: url('/pablo.jpg'); background-size: cover;        
+            background-position: center 25%; background-repeat: no-repeat;
+            border: 3px solid var(--neon-pink); z-index: 9999; cursor: pointer;
             box-shadow: 0 0 20px var(--neon-pink);
             animation: floatMove 8s infinite ease-in-out, rotateSlow 6s infinite linear;
         }
@@ -161,12 +151,7 @@
             to { transform: rotate(360deg); }
         }
 
-        .explode {
-            transform: scale(4) !important;
-            opacity: 0 !important;
-            transition: all 0.4s ease-out;
-            pointer-events: none;
-        }
+        .explode { transform: scale(4) !important; opacity: 0 !important; transition: all 0.4s ease-out; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -235,6 +220,52 @@
                 document.body.appendChild(head);
             }
         }
+
+        // --- FUNCIONES DE LA LÓGICA DEL JUEGO ---
+        function openModal(gameName) {
+            document.getElementById('selected-game-title').innerText = gameName;
+            document.getElementById('room-modal').style.display = 'block';
+            document.getElementById('room-info').innerText = '';
+        }
+
+        function closeModal() {
+            document.getElementById('room-modal').style.display = 'none';
+        }
+
+        function generateRoom() {
+            const game = document.getElementById('selected-game-title').innerText;
+            const pass = document.getElementById('room-pass').value || "123";
+            socket.emit('createRoom', { game, pass });
+        }
+
+        function joinRoom() {
+            const roomId = document.getElementById('room-id').value;
+            const pass = document.getElementById('room-pass').value;
+            if(!roomId) return alert("Ingresa ID de sala");
+            socket.emit('joinRoom', { roomId, pass });
+        }
+
+        socket.on('roomCreated', (data) => {
+            idSalaActual = data.roomId;
+            soyAnfitrion = true;
+            document.getElementById('room-info').innerText = "SALA: " + data.roomId;
+        });
+
+        socket.on('startGame', (data) => {
+            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('room-modal').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+            
+            // Lógica para iniciar cada juego específico
+            const game = data.game;
+            if(game === 'PING PONG') startPingPong(socket, soyAnfitrion, data.roomId);
+            if(game === 'CARRERA 2D') startCarrera(socket, soyAnfitrion, data.roomId);
+            if(game === 'TETRIX') startTetrix(socket, soyAnfitrion, data.roomId);
+            if(game === 'TIRO') startTiro(socket, soyAnfitrion, data.roomId);
+            if(game === 'LABERINTO') startLaberinto(socket, soyAnfitrion, data.roomId);
+        });
+
+        socket.on('error', (msg) => alert(msg));
     </script>
 </body>
 </html>
