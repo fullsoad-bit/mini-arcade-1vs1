@@ -1,185 +1,151 @@
-const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
+// Variables con prefijo 'pp' para evitar choques con otros juegos
+let ppCanvas, ppCtx, ppRoomId, ppRole, ppActive = false;
+let ppUser = { x: 0, y: 160, score: 0 };
+let ppOpponent = { x: 0, y: 160, score: 0 };
+let ppBall = { x: 0, y: 0, speedX: 4, speedY: 4, radius: 7 };
 
-// Ajuste para móviles: Si es celular, lo hacemos un poco más estrecho
-const isMobileDevice = /Android|iPhone|iPad/i.test(navigator.userAgent);
-canvas.width = isMobileDevice ? 400 : 600; 
-canvas.height = 400;
-
-canvas.style.cssText = "background:#000; border:4px solid #39FF14; display:block; margin:10px auto; max-width:95vw; height:auto; touch-action:none;";
-
-let currentRoomId = null;
-let role = "spectator"; 
-let isGameActive = false;
-
-const paddleWidth = 12, paddleHeight = 80;
-let user = { x: 0, y: 160, score: 0 };
-let opponent = { x: canvas.width - 12, y: 160, score: 0 };
-
-const INITIAL_SPEED = 4;
-let ball = { x: canvas.width / 2, y: 200, speedX: INITIAL_SPEED, speedY: INITIAL_SPEED, radius: 7 };
+const PP_PADDLE_W = 12, PP_PADDLE_H = 80;
 
 function startPingPong(roomId, isHost) {
-    currentRoomId = roomId.toString();
-    role = isHost ? 'host' : 'guest';
-    isGameActive = true;
+    // 1. Crear canvas de forma segura
+    ppCanvas = document.createElement('canvas');
+    ppCtx = ppCanvas.getContext('2d');
+    
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    ppCanvas.width = isMobile ? 400 : 600; 
+    ppCanvas.height = 400;
+    ppCanvas.style.cssText = "background:#000; border:4px solid #39FF14; display:block; margin:10px auto; max-width:95vw; height:auto; touch-action:none;";
 
-    // Posiciones según rol
-    if (role === 'guest') { 
-        user.x = canvas.width - paddleWidth; 
-        opponent.x = 0; 
-    } else { 
-        user.x = 0; 
-        opponent.x = canvas.width - paddleWidth; 
-    }
+    // 2. Configurar estado
+    ppRoomId = roomId.toString();
+    ppRole = isHost ? 'host' : 'guest';
+    ppActive = true;
 
+    // 3. Posiciones iniciales
+    ppUser = { x: (ppRole === 'host' ? 0 : ppCanvas.width - PP_PADDLE_W), y: 160, score: 0 };
+    ppOpponent = { x: (ppRole === 'host' ? ppCanvas.width - PP_PADDLE_W : 0), y: 160, score: 0 };
+    ppBall = { x: ppCanvas.width / 2, y: ppCanvas.height / 2, speedX: 5, speedY: 5, radius: 7 };
+
+    // 4. Limpiar y montar UI
     const container = document.getElementById('game-container');
     container.innerHTML = "";
     
     const title = document.createElement('h2');
     title.style.cssText = "color:var(--neon-pink); font-family:'Press Start 2P'; font-size:12px; margin:10px;";
-    title.innerText = `MODO: ${role.toUpperCase()} | PRIMERO A 5`;
+    title.innerText = `MODO: ${ppRole.toUpperCase()} | PRIMERO A 5`;
+    
     container.appendChild(title);
-    container.appendChild(canvas);
+    container.appendChild(ppCanvas);
 
-    if (isMobileDevice) setupMobileControls(container);
+    if (isMobile) setupPpMobile(container);
 
-    // ESCUCHADOR DE RED ÚNICO (Canal sync)
-    socket.off('sync'); // Limpiar previos
+    // 5. Red
+    socket.off('sync');
     socket.on('sync', (data) => {
-        if (!isGameActive) return;
-
-        // Recibir movimiento del rival
-        if (data.type === 'p_move') {
-            opponent.y = data.y;
+        if (!ppActive) return;
+        if (data.type === 'pp_move') ppOpponent.y = data.y;
+        if (data.type === 'pp_ball' && ppRole === 'guest') {
+            ppBall.x = data.x; ppBall.y = data.y;
+            ppUser.score = data.scoreG; ppOpponent.score = data.scoreH;
         }
-
-        // Recibir pelota y marcador (Solo el Guest recibe del Host)
-        if (data.type === 'ball_sync' && role === 'guest') {
-            ball.x = data.x;
-            ball.y = data.y;
-            // Invertimos la lógica del marcador para que el Guest vea su puntaje a la derecha
-            user.score = data.scoreGuest;
-            opponent.score = data.scoreHost;
+        if (data.type === 'pp_final') {
+            ppActive = false;
+            alert(data.msg);
+            window.location.reload();
         }
     });
 
-    gameLoop();
+    // 6. Controles Mouse
+    ppCanvas.onmousemove = (e) => {
+        if (!ppActive) return;
+        let rect = ppCanvas.getBoundingClientRect();
+        let mouseY = (e.clientY - rect.top) * (ppCanvas.height / rect.height);
+        ppUser.y = Math.max(0, Math.min(ppCanvas.height - PP_PADDLE_H, mouseY - PP_PADDLE_H / 2));
+        socket.emit('sync', { roomId: ppRoomId, type: 'pp_move', y: ppUser.y });
+    };
+
+    requestAnimationFrame(ppLoop);
 }
 
-function movePaddle(dir) {
-    const speed = 30;
-    if (dir === "up" && user.y > 0) user.y -= speed;
-    if (dir === "down" && user.y < canvas.height - paddleHeight) user.y += speed;
+function ppLoop() {
+    if (!ppActive) return;
+    
+    if (ppRole === 'host') {
+        ppBall.x += ppBall.speedX;
+        ppBall.y += ppBall.speedY;
 
-    socket.emit('sync', { roomId: currentRoomId, type: 'p_move', y: user.y });
-}
+        // Rebotes
+        if (ppBall.y < 0 || ppBall.y > ppCanvas.height) ppBall.speedY *= -1;
 
-// Control por Mouse (PC)
-canvas.addEventListener("mousemove", (evt) => {
-    if (!isGameActive) return;
-    let rect = canvas.getBoundingClientRect();
-    let mouseY = (evt.clientY - rect.top) * (canvas.height / rect.height);
-    user.y = mouseY - paddleHeight / 2;
-
-    if (user.y < 0) user.y = 0;
-    if (user.y > canvas.height - paddleHeight) user.y = canvas.height - paddleHeight;
-
-    socket.emit('sync', { roomId: currentRoomId, type: 'p_move', y: user.y });
-});
-
-function update() {
-    if (role === 'host') { 
-        ball.x += ball.speedX;
-        ball.y += ball.speedY;
-
-        // Rebote techo y suelo
-        if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
-            ball.speedY = -ball.speedY;
+        // Colisiones Paletas
+        if (ppBall.x < PP_PADDLE_W && ppBall.y > ppUser.y && ppBall.y < ppUser.y + PP_PADDLE_H) {
+            ppBall.speedX = Math.abs(ppBall.speedX) * 1.05;
+        }
+        if (ppBall.x > ppCanvas.width - PP_PADDLE_W && ppBall.y > ppOpponent.y && ppBall.y < ppOpponent.y + PP_PADDLE_H) {
+            ppBall.speedX = -Math.abs(ppBall.speedX) * 1.05;
         }
 
-        // Colisión Paleta Izquierda (Host)
-        if (ball.x - ball.radius < user.x + paddleWidth && ball.y > user.y && ball.y < user.y + paddleHeight) {
-            ball.speedX = Math.abs(ball.speedX) * 1.05;
-        }
+        // Puntos
+        if (ppBall.x < 0) { ppOpponent.score++; resetPpBall(); }
+        if (ppBall.x > ppCanvas.width) { ppUser.score++; resetPpBall(); }
 
-        // Colisión Paleta Derecha (Guest)
-        if (ball.x + ball.radius > opponent.x && ball.y > opponent.y && ball.y < opponent.y + paddleHeight) {
-            ball.speedX = -Math.abs(ball.speedX) * 1.05;
-        }
-
-        // Goles
-        if (ball.x < 0) { opponent.score++; resetBall(); }
-        if (ball.x > canvas.width) { user.score++; resetBall(); }
-
-        // Enviar datos al Guest
+        // Sincronizar con Guest
         socket.emit('sync', { 
-            roomId: currentRoomId, 
-            type: 'ball_sync',
-            x: ball.x, 
-            y: ball.y,
-            scoreHost: user.score,
-            scoreGuest: opponent.score
+            roomId: ppRoomId, type: 'pp_ball', 
+            x: ppBall.x, y: ppBall.y, 
+            scoreH: ppUser.score, scoreG: ppOpponent.score 
         });
 
-        if (user.score >= 5 || opponent.score >= 5) endPingPong();
+        if (ppUser.score >= 5 || ppOpponent.score >= 5) {
+            let win = ppUser.score >= 5 ? "HOST" : "GUEST";
+            socket.emit('sync', { roomId: ppRoomId, type: 'pp_final', msg: "GANÓ " + win });
+            ppActive = false; alert("GANÓ " + win); window.location.reload();
+        }
     }
+
+    // Dibujar
+    ppCtx.fillStyle = "#000";
+    ppCtx.fillRect(0, 0, ppCanvas.width, ppCanvas.height);
+    
+    ppCtx.strokeStyle = "#333";
+    ppCtx.setLineDash([10, 10]);
+    ppCtx.beginPath(); ppCtx.moveTo(ppCanvas.width/2, 0); ppCtx.lineTo(ppCanvas.width/2, ppCanvas.height); ppCtx.stroke();
+
+    ppCtx.fillStyle = "#39FF14"; ppCtx.fillRect(ppUser.x, ppUser.y, PP_PADDLE_W, PP_PADDLE_H);
+    ppCtx.fillStyle = "#FF00FF"; ppCtx.fillRect(ppOpponent.x, ppOpponent.y, PP_PADDLE_W, PP_PADDLE_H);
+    
+    ppCtx.fillStyle = "#FFF";
+    ppCtx.beginPath(); ppCtx.arc(ppBall.x, ppBall.y, ppBall.radius, 0, Math.PI*2); ppCtx.fill();
+
+    ppCtx.font = "20px Monospace";
+    ppCtx.fillText(ppUser.score, ppCanvas.width/2 - 50, 50);
+    ppCtx.fillText(ppOpponent.score, ppCanvas.width/2 + 30, 50);
+
+    requestAnimationFrame(ppLoop);
 }
 
-function resetBall() {
-    ball.x = canvas.width / 2;
-    ball.y = canvas.height / 2;
-    ball.speedX = (ball.speedX > 0 ? -INITIAL_SPEED : INITIAL_SPEED);
+function resetPpBall() {
+    ppBall.x = ppCanvas.width / 2;
+    ppBall.y = ppCanvas.height / 2;
+    ppBall.speedX *= -1;
 }
 
-function render() {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Red
-    ctx.strokeStyle = "#333";
-    ctx.setLineDash([10, 10]);
-    ctx.beginPath(); ctx.moveTo(canvas.width / 2, 0); ctx.lineTo(canvas.width / 2, canvas.height); ctx.stroke();
-
-    // Paletas
-    ctx.fillStyle = "#39FF14"; ctx.fillRect(user.x, user.y, paddleWidth, paddleHeight);
-    ctx.fillStyle = "#FF00FF"; ctx.fillRect(opponent.x, opponent.y, paddleWidth, paddleHeight);
-
-    // Pelota
-    ctx.fillStyle = "#FFF";
-    ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2); ctx.fill();
-
-    // Marcador
-    ctx.font = "20px Monospace";
-    ctx.fillStyle = "#FFF";
-    ctx.fillText(user.score, (canvas.width / 2) - 50, 50);
-    ctx.fillText(opponent.score, (canvas.width / 2) + 30, 50);
-}
-
-function gameLoop() {
-    if (!isGameActive) return;
-    update();
-    render();
-    requestAnimationFrame(gameLoop);
-}
-
-function endPingPong() {
-    isGameActive = false;
-    alert("PARTIDA TERMINADA");
-    window.location.reload();
-}
-
-function setupMobileControls(cont) {
+function setupPpMobile(cont) {
     const box = document.createElement('div');
     box.style.cssText = "display:flex; justify-content:space-around; width:100%; margin-top:15px;";
-    const btnS = "width:45%; height:80px; background:#333; border:2px solid #39FF14; color:white; font-size:30px; border-radius:12px; touch-action:none;";
+    const btnS = "width:45%; height:80px; background:#222; border:2px solid #39FF14; color:white; font-size:30px; border-radius:12px;";
     
     const bU = document.createElement('button'); bU.innerHTML = "🔼"; bU.style.cssText = btnS;
     const bD = document.createElement('button'); bD.innerHTML = "🔽"; bD.style.cssText = btnS;
 
-    bU.ontouchstart = (e) => { e.preventDefault(); movePaddle("up"); };
-    bD.ontouchstart = (e) => { e.preventDefault(); movePaddle("down"); };
+    const move = (d) => {
+        if (d === "up") ppUser.y = Math.max(0, ppUser.y - 40);
+        else ppUser.y = Math.min(ppCanvas.height - PP_PADDLE_H, ppUser.y + 40);
+        socket.emit('sync', { roomId: ppRoomId, type: 'pp_move', y: ppUser.y });
+    };
 
+    bU.onclick = () => move("up");
+    bD.onclick = () => move("down");
     box.appendChild(bU); box.appendChild(bD);
     cont.appendChild(box);
 }
