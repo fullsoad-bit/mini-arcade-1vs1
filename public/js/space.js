@@ -23,9 +23,27 @@ function startSpace(roomId, isHost) {
 
     socket.off('sync');
     socket.on('sync', (data) => {
-        if (!spActive || data.type !== 'sp_sync') return;
-        if (spRole === 'host') { spP2.x = data.px; spP2.b = data.pb; }
-        else { spP1.x = data.px; spP1.b = data.pb; spMeteors = data.met; spP1.hp = data.p1h; spP2.hp = data.p2h; spBoss = data.bos; spTimer = data.tm; }
+        if (!spActive) return;
+        
+        if (data.type === 'sp_sync') {
+            if (spRole === 'host') {
+                spP2.x = data.px; spP2.b = data.pb;
+            } else {
+                spP1.x = data.px; spP1.b = data.pb;
+                spMeteors = data.met; spP1.hp = data.p1h; spP2.hp = data.p2h;
+                spBoss = data.bos; spTimer = data.tm;
+            }
+        }
+
+        // --- CORRECCIÓN: PROCESAR DAÑO EN EL HOST ---
+        if (spRole === 'host') {
+            if (data.type === 'sp_hit_p1') spP1.hp -= 25;
+            if (data.type === 'sp_hit_boss') spBoss.hp -= 5;
+        }
+
+        if (data.type === 'sp_final') {
+            handleFinalMessage(data.winRole, data.reason);
+        }
     });
 
     if (spLoop) clearInterval(spLoop);
@@ -46,22 +64,17 @@ function runSpace() {
         bul.y += (spRole === 'host') ? -12 : 12;
         if (bul.y < 0 || bul.y > 600) my.b.splice(i, 1);
         
-        // Colisión con rival (20 de daño)
+        // Impacto al rival
         if (Math.abs(bul.x - rival.x) < 25 && Math.abs(bul.y - rival.y) < 25) {
-            if (spRole === 'host') spP2.hp -= 20; else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_p1'});
+            if (spRole === 'host') spP2.hp -= 25; 
+            else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_p1'});
             my.b.splice(i, 1);
         }
 
-        // Colisión con meteoritos (Destruibles)
-        spMeteors.forEach((m, mi) => {
-            if (Math.abs(bul.x - m.x) < 20 && Math.abs(bul.y - m.y) < 20) {
-                if (spRole === 'host') spMeteors.splice(mi, 1);
-                my.b.splice(i, 1);
-            }
-        });
-
-        if (spBoss.active && Math.abs(bul.x - spBoss.x) < 40 && Math.abs(bul.y - spBoss.y) < 40) {
-            if (spRole === 'host') spBoss.hp -= 2; else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_boss'});
+        // Impacto al Boss
+        if (spBoss.active && spBoss.hp > 0 && Math.abs(bul.x - spBoss.x) < 40 && Math.abs(bul.y - spBoss.y) < 40) {
+            if (spRole === 'host') spBoss.hp -= 5; 
+            else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_boss'});
             my.b.splice(i, 1);
         }
     });
@@ -70,8 +83,9 @@ function runSpace() {
         spTimer += 0.03;
         if (spTimer > 45 && !spBoss.active) spBoss.active = true;
         
+        // Boss IA
         if (spBoss.active && spBoss.hp > 0) {
-            if (spBoss.y < 250) spBoss.y += 1.5;
+            if (spBoss.y < 200) spBoss.y += 1.5;
             spBoss.x = 200 + Math.sin(spTimer) * 100;
             if (Math.random() < 0.06) {
                 for(let a=0; a<Math.PI*2; a+=Math.PI/4) spBoss.b.push({x: spBoss.x, y: spBoss.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5});
@@ -83,55 +97,67 @@ function runSpace() {
             [spP1, spP2].forEach(p => { if (Math.abs(bb.x - p.x) < 20 && Math.abs(bb.y - p.y) < 20) { p.hp -= 15; spBoss.b.splice(i, 1); } });
         });
 
-        // Meteoritos desde el centro
-        if (Math.random() < 0.04) {
-            spMeteors.push({ x: Math.random()*400, y: 300, s: (Math.random() > 0.5 ? 1 : -1) * (Math.random()*3+2) });
-        }
+        // Meteoros
+        if (Math.random() < 0.04) spMeteors.push({ x: Math.random()*400, y: 300, s: (Math.random() > 0.5 ? 1 : -1) * (Math.random()*3+2) });
         spMeteors.forEach((m, i) => {
             m.y += m.s; 
             if (m.y > 600 || m.y < 0) spMeteors.splice(i, 1);
-            [spP1, spP2].forEach(p => { 
-                if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { 
-                    p.hp -= 40; // Meteoritos quitan 40hp
-                    spMeteors.splice(i, 1); 
-                } 
-            });
+            [spP1, spP2].forEach(p => { if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { p.hp -= 40; spMeteors.splice(i, 1); } });
         });
 
-        if (spP1.hp <= 0 || spP2.hp <= 0 || (spBoss.active && spBoss.hp <= 0)) { 
-            spActive = false; 
-            setTimeout(() => { alert("COMBATE FINALIZADO"); window.location.reload(); }, 200); 
+        // REVISAR FINAL
+        if (spP1.hp <= 0 || spP2.hp <= 0 || (spBoss.active && spBoss.hp <= 0)) {
+            let winRole = "draw";
+            let reason = "Empate";
+            if (spP1.hp <= 0) { winRole = "guest"; reason = "Nave Host Destruida"; }
+            else if (spP2.hp <= 0) { winRole = "host"; reason = "Nave Guest Destruida"; }
+            else if (spBoss.hp <= 0) { winRole = "coop"; reason = "¡Boss Derrotado!"; }
+
+            socket.emit('sync', { roomId: spRoomId, type: 'sp_final', winRole, reason });
+            handleFinalMessage(winRole, reason);
         }
     }
+
     socket.emit('sync', { roomId: spRoomId, type: 'sp_sync', px: my.x, pb: my.b, met: spMeteors, p1h: spP1.hp, p2h: spP2.hp, bos: spBoss, tm: spTimer });
     drawSp();
+}
+
+function handleFinalMessage(winRole, reason) {
+    if (!spActive) return;
+    spActive = false;
+    clearInterval(spLoop);
+
+    let finalMsg = "";
+    if (winRole === "coop") finalMsg = "¡MISIÓN CUMPLIDA!\n" + reason;
+    else if (winRole === spRole) finalMsg = "¡VICTORIA! 🏆\n" + reason;
+    else if (winRole === "draw") finalMsg = "¡EMPATE!\n" + reason;
+    else finalMsg = "¡DERROTA! 💀\n" + reason;
+
+    setTimeout(() => {
+        alert(finalMsg);
+        window.location.reload();
+    }, 500);
 }
 
 function drawSp() {
     spCtx.fillStyle = (spTimer > 40 && spTimer < 45 && Math.floor(spTimer*5)%2==0) ? "#400" : "#00050a";
     spCtx.fillRect(0, 0, 400, 600);
     
-    // Meteoros
     spMeteors.forEach(m => { spCtx.fillStyle = "#555"; spCtx.beginPath(); spCtx.arc(m.x, m.y, 14, 0, Math.PI*2); spCtx.fill(); });
 
-    // Barras de Vida Estilo Arcade
+    // BARRAS DE VIDA
     const drawHealthBar = (x, y, hp, color, label) => {
-        spCtx.fillStyle = "#333";
-        spCtx.fillRect(x, y, 150, 12);
-        spCtx.fillStyle = color;
-        spCtx.fillRect(x, y, (Math.max(0, hp) / 1000) * 150, 12);
-        spCtx.strokeStyle = "#fff";
-        spCtx.lineWidth = 1;
-        spCtx.strokeRect(x, y, 150, 12);
-        spCtx.fillStyle = "#fff";
-        spCtx.font = "bold 9px Arial";
-        spCtx.fillText(label + ": " + Math.max(0, hp), x, y - 5);
+        spCtx.fillStyle = "#222"; spCtx.fillRect(x, y, 150, 12);
+        spCtx.fillStyle = color; spCtx.fillRect(x, y, (Math.max(0, hp) / 1000) * 150, 12);
+        spCtx.strokeStyle = "#fff"; spCtx.strokeRect(x, y, 150, 12);
+        spCtx.fillStyle = "#fff"; spCtx.font = "9px 'Press Start 2P', cursive";
+        spCtx.fillText(label, x, y - 5);
     };
 
-    drawHealthBar(20, 580, spP1.hp, "#39FF14", "VIDA P1");
-    drawHealthBar(230, 30, spP2.hp, "#FF00FF", "VIDA P2");
+    drawHealthBar(20, 580, spP1.hp, "#39FF14", "P1 (VERDE)");
+    drawHealthBar(230, 30, spP2.hp, "#FF00FF", "P2 (ROSA)");
 
-    // Boss Alien
+    // BOSS
     if (spBoss.active && spBoss.hp > 0) {
         spCtx.save();
         spCtx.translate(spBoss.x, spBoss.y);
@@ -139,31 +165,23 @@ function drawSp() {
         for(let i=0; i<5; i++) {
             spCtx.beginPath(); spCtx.moveTo(-20 + i*10, 20);
             let offset = Math.sin(spTimer * 5 + i) * 15;
-            spCtx.quadraticCurveTo(-20 + i*10 + offset, 40, -20 + i*10, 60);
-            spCtx.stroke();
+            spCtx.quadraticCurveTo(-20 + i*10 + offset, 40, -20 + i*10, 60); spCtx.stroke();
         }
         spCtx.fillStyle = "#39FF14"; spCtx.beginPath(); spCtx.ellipse(0, 0, 40, 30, 0, 0, Math.PI * 2); spCtx.fill();
         spCtx.fillStyle = "black"; 
         spCtx.beginPath(); spCtx.ellipse(-15, -5, 10, 15, Math.PI/4, 0, Math.PI * 2); spCtx.fill();
         spCtx.beginPath(); spCtx.ellipse(15, -5, 10, 15, -Math.PI/4, 0, Math.PI * 2); spCtx.fill();
         spCtx.restore();
-        
-        // Barra Vida Boss
-        spCtx.fillStyle = "red";
-        spCtx.fillRect(spBoss.x-40, spBoss.y-50, (spBoss.hp/500)*80, 6);
-        
+        spCtx.fillStyle = "red"; spCtx.fillRect(spBoss.x-40, spBoss.y-50, (spBoss.hp/500)*80, 6);
         spBoss.b.forEach(bb => { spCtx.fillStyle = "#ff0"; spCtx.beginPath(); spCtx.arc(bb.x, bb.y, 4, 0, Math.PI*2); spCtx.fill(); });
     }
 
-    // Naves y Balas
+    // NAVES
     [spP1, spP2].forEach(p => {
         p.b.forEach(b => { spCtx.fillStyle = "#0ff"; spCtx.fillRect(b.x-2, b.y-10, 4, 15); });
         spCtx.fillStyle = p.color; spCtx.beginPath();
-        if (p === spP1) {
-            spCtx.moveTo(p.x, p.y-22); spCtx.lineTo(p.x-18, p.y+12); spCtx.lineTo(p.x+18, p.y+12);
-        } else {
-            spCtx.moveTo(p.x, p.y+22); spCtx.lineTo(p.x-18, p.y-12); spCtx.lineTo(p.x+18, p.y-12);
-        }
+        if (p === spP1) { spCtx.moveTo(p.x, p.y-22); spCtx.lineTo(p.x-18, p.y+12); spCtx.lineTo(p.x+18, p.y+12); }
+        else { spCtx.moveTo(p.x, p.y+22); spCtx.lineTo(p.x-18, p.y-12); spCtx.lineTo(p.x+18, p.y-12); }
         spCtx.fill();
     });
 }
@@ -198,13 +216,6 @@ function setupSpControls(cont) {
 
     jBase.appendChild(jStick); ui.appendChild(jBase); ui.appendChild(btnS); cont.appendChild(ui);
 }
-
-socket.on('sync', (data) => {
-    if (spRole === 'host') { 
-        if(data.type === 'sp_hit_p1') spP1.hp -= 20; 
-        if(data.type === 'sp_hit_boss') spBoss.hp -= 2; 
-    }
-});
 
 window.onkeydown = (e) => {
     if (e.key === "ArrowLeft") { spJoy.active = true; spJoy.dx = -1; }
