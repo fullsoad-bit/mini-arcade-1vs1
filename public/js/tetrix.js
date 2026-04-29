@@ -20,7 +20,6 @@ let opponentScore = 0;
 let tetrixTimeLeft = 180;
 let tetrixGameInterval, tetrixTimerInterval;
 
-// --- PIEZAS REALES RE-ESTABLECIDAS ---
 const PIECES = [
     [ [[1,1,1,1]], "#00f0f0" ], // I
     [ [[1,1,1],[0,1,0]], "#a000f0" ], // T
@@ -95,8 +94,9 @@ function lockPiece() {
         for (let c = 0; c < piece.shape[r].length; c++) {
             if (!piece.shape[r][c]) continue;
             if (piece.y + r < 0) {
-                myScore = Math.max(0, myScore - 100);
+                // Game Over personal: se limpia tu tablero pero sigues jugando
                 initBoard();
+                myScore = Math.max(0, myScore - 500); 
                 syncTetrix();
                 return;
             }
@@ -122,7 +122,7 @@ function checkLines() {
 }
 
 function syncTetrix() {
-    if (tetrixRoomId && socket) {
+    if (tetrixRoomId && typeof socket !== 'undefined') {
         socket.emit('sync', { 
             roomId: tetrixRoomId, 
             type: 'tetrix_score',
@@ -134,34 +134,31 @@ function syncTetrix() {
 
 function renderTetrix() {
     if (!isTetrixActive) return;
+    
     ctxT.fillStyle = VACANTE;
     ctxT.fillRect(0, 0, canvasT.width, canvasT.height);
+    
     drawBoard();
     
+    // Dibujar pieza actual
     for (let r = 0; r < piece.shape.length; r++) {
         for (let c = 0; c < piece.shape[r].length; c++) {
             if (piece.shape[r][c]) drawSquare(piece.x + c, piece.y + r, piece.color);
         }
     }
 
-    // HUD
-    ctxT.fillStyle = "rgba(0,0,0,0.8)";
-    ctxT.fillRect(0, 0, canvasT.width, 40);
-    ctxT.fillStyle = "white";
-    ctxT.font = "bold 10px Arial";
-    ctxT.fillText(`⏱️${tetrixTimeLeft}s | YO:${myScore} | RIVAL:${opponentScore}`, 5, 25);
+    // HUD Superior
+    ctxT.fillStyle = "rgba(0,0,0,0.85)";
+    ctxT.fillRect(0, 0, canvasT.width, 45);
+    ctxT.fillStyle = "#FF00FF";
+    ctxT.font = "bold 12px Arial";
+    ctxT.fillText(`⏱️ ${tetrixTimeLeft}s`, 5, 18);
+    ctxT.fillStyle = "#39FF14";
+    ctxT.fillText(`YO: ${myScore}`, 5, 38);
+    ctxT.fillStyle = "#FFF";
+    ctxT.fillText(`RIVAL: ${opponentScore}`, canvasT.width - 80, 38);
     
     requestAnimationFrame(renderTetrix);
-}
-
-// Escuchar Red
-if (typeof socket !== 'undefined') {
-    socket.on('sync', (data) => {
-        if (data.type === 'tetrix_score') {
-            opponentScore = data.score;
-            if (tetrixRole === 'guest') tetrixTimeLeft = data.timeLeft;
-        }
-    });
 }
 
 function startTetrix(roomId, isHost) {
@@ -169,14 +166,25 @@ function startTetrix(roomId, isHost) {
     tetrixRole = isHost ? 'host' : 'guest';
     isTetrixActive = true;
     initBoard();
-    myScore = 0; opponentScore = 0; tetrixTimeLeft = 180;
+    myScore = 0; 
+    opponentScore = 0; 
+    tetrixTimeLeft = 180;
+    piece = randomPiece();
 
     const container = document.getElementById('game-container');
     container.innerHTML = ""; 
     container.appendChild(canvasT);
 
-    // Forzamos la creación de controles para asegurar visibilidad
     setupMobileTetrixControls(container);
+
+    // ESCUCHADOR DE RED
+    socket.off('sync');
+    socket.on('sync', (data) => {
+        if (data.type === 'tetrix_score') {
+            opponentScore = data.score;
+            if (tetrixRole === 'guest') tetrixTimeLeft = data.timeLeft;
+        }
+    });
 
     if (tetrixGameInterval) clearInterval(tetrixGameInterval);
     tetrixGameInterval = setInterval(moveDown, 800);
@@ -187,7 +195,9 @@ function startTetrix(roomId, isHost) {
             if (tetrixTimeLeft > 0) {
                 tetrixTimeLeft--;
                 syncTetrix();
-            } else endTetrix();
+            } else {
+                endTetrix();
+            }
         }, 1000);
     }
     renderTetrix();
@@ -204,13 +214,11 @@ function setupMobileTetrixControls(cont) {
     const btnU = document.createElement('div'); btnU.innerHTML = "🔄"; btnU.style.cssText = btnStyle;
     const btnD = document.createElement('div'); btnD.innerHTML = "🔽"; btnD.style.cssText = btnStyle;
 
-    // Eventos Touch
     btnL.ontouchstart = (e) => { e.preventDefault(); if (!collision(-1, 0, piece.shape)) piece.x--; };
     btnR.ontouchstart = (e) => { e.preventDefault(); if (!collision(1, 0, piece.shape)) piece.x++; };
     btnU.ontouchstart = (e) => { e.preventDefault(); rotatePiece(); };
     btnD.ontouchstart = (e) => { e.preventDefault(); moveDown(); };
 
-    // Layout
     controlsDiv.appendChild(document.createElement('div')); 
     controlsDiv.appendChild(btnU); 
     controlsDiv.appendChild(document.createElement('div'));
@@ -223,17 +231,20 @@ function setupMobileTetrixControls(cont) {
 }
 
 function endTetrix() {
+    if (!isTetrixActive) return;
     isTetrixActive = false;
     clearInterval(tetrixGameInterval);
     clearInterval(tetrixTimerInterval);
-    alert(`TIEMPO TERMINADO\nTu puntuación: ${myScore}\nRival: ${opponentScore}`);
+    
+    let result = (myScore > opponentScore) ? "¡GANASTE!" : (myScore < opponentScore ? "GANÓ EL RIVAL" : "EMPATE");
+    alert(`TIEMPO TERMINADO\n${result}\nTu puntuación: ${myScore}\nRival: ${opponentScore}`);
     window.location.reload();
 }
 
 window.addEventListener("keydown", (e) => {
     if (!isTetrixActive) return;
-    if (e.keyCode == 37 && !collision(-1, 0, piece.shape)) piece.x--;
-    if (e.keyCode == 39 && !collision(1, 0, piece.shape)) piece.x++;
-    if (e.keyCode == 40) moveDown();
-    if (e.keyCode == 38) rotatePiece();
+    if (e.keyCode == 37) { e.preventDefault(); if (!collision(-1, 0, piece.shape)) piece.x--; }
+    if (e.keyCode == 39) { e.preventDefault(); if (!collision(1, 0, piece.shape)) piece.x++; }
+    if (e.keyCode == 40) { e.preventDefault(); moveDown(); }
+    if (e.keyCode == 38) { e.preventDefault(); rotatePiece(); }
 });
