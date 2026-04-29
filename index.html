@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://googletagmanager.com"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-XXXXXXXXXX');
+    </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MINI 1vs1 | Arcade Online</title>
@@ -224,52 +234,6 @@
                 };
                 document.body.appendChild(head);
             }
-        }
-
-        function openModal(gameName) {
-            document.getElementById('room-modal').style.display = 'block';
-            document.getElementById('selected-game-title').innerText = gameName;
-            document.getElementById('room-info').innerHTML = "";
-        }
-
-        function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
-
-        function generateRoom() {
-            const pass = document.getElementById('room-pass').value || "123";
-            soyAnfitrion = true;
-            socket.emit('create_room', { password: pass, game: document.getElementById('selected-game-title').innerText });
-        }
-
-        function joinRoom() {
-            const id = document.getElementById('room-id').value;
-            const pass = document.getElementById('room-pass').value || "123";
-            soyAnfitrion = false;
-            socket.emit('join_room', { roomId: id.toString(), password: pass });
-        }
-
-        socket.on('room_created', (data) => {
-            idSalaActual = data.roomId;
-            document.getElementById('room-info').innerHTML = `SALA: ${data.roomId}<br>PASS: ${data.password}`;
-        });
-
-        socket.on('player_joined', (data) => {
-            idSalaActual = data.roomId; 
-            closeModal();
-            iniciarJuego(data.game);
-        });
-
-        socket.on('error_msg', (msg) => { alert(msg); });
-
-        function iniciarJuego(nombre) {
-            document.getElementById('ui-layer').style.display = "none";
-            document.getElementById('game-container').style.display = "block";
-            document.getElementById('game-container').innerHTML = ""; 
-
-            if(nombre === "CARRERA 2D") startRacing(idSalaActual, soyAnfitrion);
-            else if(nombre === "PING PONG") startPingPong(idSalaActual, soyAnfitrion);
-            else if(nombre === "TETRIX") startTetrix(idSalaActual, soyAnfitrion);
-            else if(nombre === "TIRO") startTiro(idSalaActual, soyAnfitrion);
-            else if(nombre === "LABERINTO") startLaberinto(idSalaActual, soyAnfitrion);
         }
     </script>
 </body>
