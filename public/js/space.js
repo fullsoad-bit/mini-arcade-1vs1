@@ -1,4 +1,3 @@
-// Variables globales únicas para este archivo
 let spCanvas, spCtx, spRoomId, spRole, spActive = false;
 let spP1 = { x: 200, y: 530, hp: 100, color: "#39FF14", b: [] };
 let spP2 = { x: 200, y: 70, hp: 100, color: "#FF00FF", b: [] };
@@ -6,7 +5,6 @@ let spMeteors = [], spBoss = { active: false, x: 200, y: -100, hp: 500, b: [] };
 let spTimer = 0, spJoy = { active: false, dx: 0 }, spLoop;
 
 function startSpace(roomId, isHost) {
-    // Crear canvas
     spCanvas = document.createElement('canvas');
     spCtx = spCanvas.getContext('2d');
     spCanvas.width = 400; spCanvas.height = 600;
@@ -15,28 +13,19 @@ function startSpace(roomId, isHost) {
     spRoomId = roomId.toString();
     spRole = isHost ? 'host' : 'guest';
     spActive = true;
-    
-    // Reset estado
     spTimer = 0; spP1.hp = 100; spP2.hp = 100; spP1.b = []; spP2.b = []; spMeteors = [];
     spBoss = { active: false, x: 200, y: -100, hp: 500, b: [] };
 
     const container = document.getElementById('game-container');
     container.innerHTML = ""; 
     container.appendChild(spCanvas);
-    
-    // Setup Controles
     setupSpControls(container);
 
     socket.off('sync');
     socket.on('sync', (data) => {
         if (!spActive || data.type !== 'sp_sync') return;
-        if (spRole === 'host') {
-            spP2.x = data.px; spP2.b = data.pb;
-        } else {
-            spP1.x = data.px; spP1.b = data.pb;
-            spMeteors = data.met; spP1.hp = data.p1h; spP2.hp = data.p2h;
-            spBoss = data.bos; spTimer = data.tm;
-        }
+        if (spRole === 'host') { spP2.x = data.px; spP2.b = data.pb; }
+        else { spP1.x = data.px; spP1.b = data.pb; spMeteors = data.met; spP1.hp = data.p1h; spP2.hp = data.p2h; spBoss = data.bos; spTimer = data.tm; }
     });
 
     if (spLoop) clearInterval(spLoop);
@@ -47,11 +36,8 @@ function runSpace() {
     if (!spActive) return;
     let my = (spRole === 'host') ? spP1 : spP2;
     let rival = (spRole === 'host') ? spP2 : spP1;
-
-    // Mover mi nave
     if (spJoy.active) { my.x += spJoy.dx * 7; my.x = Math.max(20, Math.min(380, my.x)); }
 
-    // Balas
     my.b.forEach((bul, i) => {
         bul.y += (spRole === 'host') ? -10 : 10;
         if (bul.y < 0 || bul.y > 600) my.b.splice(i, 1);
@@ -71,9 +57,7 @@ function runSpace() {
         if (spBoss.active && spBoss.hp > 0) {
             if (spBoss.y < 200) spBoss.y += 1.5;
             spBoss.x = 200 + Math.sin(spTimer) * 100;
-            if (Math.random() < 0.04) {
-                for(let a=0; a<Math.PI*2; a+=Math.PI/4) spBoss.b.push({x: spBoss.x, y: spBoss.y, vx: Math.cos(a)*4, vy: Math.sin(a)*4});
-            }
+            if (Math.random() < 0.04) { for(let a=0; a<Math.PI*2; a+=Math.PI/4) spBoss.b.push({x: spBoss.x, y: spBoss.y, vx: Math.cos(a)*4, vy: Math.sin(a)*4}); }
         }
         spBoss.b.forEach((bb, i) => {
             bb.x += bb.vx; bb.y += bb.vy;
@@ -85,17 +69,11 @@ function runSpace() {
             m.y += m.s; if (m.y > 600) spMeteors.splice(i, 1);
             [spP1, spP2].forEach(p => { if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { p.hp -= 2; spMeteors.splice(i, 1); } });
         });
-        if (spP1.hp <= 0 || spP2.hp <= 0 || (spBoss.active && spBoss.hp <= 0)) {
-            spActive = false; alert("FIN DEL COMBATE"); window.location.reload();
-        }
+        if (spP1.hp <= 0 || spP2.hp <= 0 || (spBoss.active && spBoss.hp <= 0)) { spActive = false; alert("DUELO TERMINADO"); window.location.reload(); }
     }
     socket.emit('sync', { roomId: spRoomId, type: 'sp_sync', px: my.x, pb: my.b, met: spMeteors, p1h: spP1.hp, p2h: spP2.hp, bos: spBoss, tm: spTimer });
     drawSp();
 }
-
-socket.on('sync', (data) => {
-    if (spRole === 'host') { if(data.type === 'sp_hit_p1') spP1.hp -= 5; if(data.type === 'sp_hit_boss') spBoss.hp -= 2; }
-});
 
 function drawSp() {
     spCtx.fillStyle = (spTimer > 40 && spTimer < 45 && Math.floor(spTimer*5)%2==0) ? "#400" : "#00050a";
@@ -118,7 +96,7 @@ function setupSpControls(cont) {
     const ui = document.createElement('div'); ui.style.cssText = "display:flex; justify-content:space-around; align-items:center; width:100%; margin-top:15px;";
     const jBase = document.createElement('div'); jBase.style.cssText = "width:90px; height:90px; background:rgba(0,240,255,0.1); border:2px solid #00f0ff; border-radius:50%; position:relative; touch-action:none;";
     const jStick = document.createElement('div'); jStick.style.cssText = "width:35px; height:35px; background:#00f0ff; border-radius:50%; position:absolute; top:27px; left:27px;";
-    jBase.ontouchmove = (e) => { e.preventDefault(); spJoy.active = true; let dx = (e.touches[0].clientX - (jBase.getBoundingClientRect().left + 45)) / 45; spJoy.dx = Math.max(-1, Math.min(1, dx)); jStick.style.transform = `translateX(${spJoy.dx * 20}px)`; };
+    jBase.ontouchmove = (e) => { e.preventDefault(); spJoy.active = true; let dx = (e.touches.clientX - (jBase.getBoundingClientRect().left + 45)) / 45; spJoy.dx = Math.max(-1, Math.min(1, dx)); jStick.style.transform = `translateX(${spJoy.dx * 20}px)`; };
     jBase.ontouchend = () => { spJoy.active = false; jStick.style.transform = "translateX(0)"; };
     const btnS = document.createElement('button'); btnS.innerHTML = "🚀"; btnS.style.cssText = "width:80px; height:80px; background:red; border-radius:50%; color:white; font-size:30px; border:none;";
     btnS.onclick = () => { let my = (spRole === 'host') ? spP1 : spP2; if (my.b.length < 5) my.b.push({ x: my.x, y: my.y + (spRole === 'host' ? -25 : 25) }); };
