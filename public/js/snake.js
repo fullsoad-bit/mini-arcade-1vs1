@@ -38,7 +38,6 @@ function startSnake(roomId, isHost) {
     container.appendChild(hud);
     container.appendChild(canvasS);
     
-    // ACTIVAR TODOS LOS CONTROLES
     setupAllControls();
 
     socket.off('sync');
@@ -55,6 +54,11 @@ function startSnake(roomId, isHost) {
         }
         if (data.type === 'snake_reset') resetMatch();
         if (data.type === 'snake_boom') triggerExplosion(data.x, data.y);
+        
+        // RECIBIR FINAL DEL JUEGO
+        if (data.type === 'snake_final') {
+            executeEndGame(data.winnerRole);
+        }
     });
 
     if (snakeGameInterval) clearInterval(snakeGameInterval);
@@ -84,8 +88,11 @@ function gameLoop() {
     if (!isSnakeActive) return;
     let my = (snakeRole === 'host') ? p1 : p2;
     my.dir = my.nextDir;
-    let newHead = { x: my.body[0].x + my.dir.x, y: my.body[0].y + my.dir.y };
+    
+    let head = my.body[0]; // Corrección de índice aplicada
+    let newHead = { x: head.x + my.dir.x, y: head.y + my.dir.y };
 
+    // Túnel
     if (newHead.x < 0) newHead.x = TILE_COUNT - 1;
     if (newHead.x >= TILE_COUNT) newHead.x = 0;
     if (newHead.y < 0) newHead.y = TILE_COUNT - 1;
@@ -109,6 +116,7 @@ function gameLoop() {
     }
 
     if (my.powerUp > 0) my.powerUp -= FRAME_RATE;
+    
     if (snakeRole === 'host') {
         if (!dynamite && Math.random() < 0.02) {
             dynamite = { x: Math.floor(Math.random()*TILE_COUNT), y: Math.floor(Math.random()*TILE_COUNT), timer: 5 };
@@ -139,8 +147,7 @@ function triggerExplosion(ex, ey) {
         let isHit = s.body.some(p => Math.abs(p.x - ex) <= 1 && Math.abs(p.y - ey) <= 1);
         if (isHit && s.powerUp <= 0 && snakeRole === 'host') {
             s.crashes++;
-            if (s.crashes >= 5) endGame();
-            else { socket.emit('sync', { roomId: snakeRoomId, type: 'snake_reset' }); resetMatch(); }
+            checkFinalScore();
         }
     });
 }
@@ -148,17 +155,43 @@ function triggerExplosion(ex, ey) {
 function reportCrash() {
     if (snakeRole === 'host') {
         p1.crashes++;
-        if (p1.crashes >= 5) endGame();
-        else { socket.emit('sync', { roomId: snakeRoomId, type: 'snake_reset' }); resetMatch(); }
+        checkFinalScore();
     } else socket.emit('sync', { roomId: snakeRoomId, type: 'guest_crash' });
+}
+
+function checkFinalScore() {
+    if (p1.crashes >= 5 || p2.crashes >= 5) {
+        let winnerRole = (p1.crashes >= 5) ? 'guest' : 'host';
+        socket.emit('sync', { roomId: snakeRoomId, type: 'snake_final', winnerRole: winnerRole });
+        executeEndGame(winnerRole);
+    } else {
+        socket.emit('sync', { roomId: snakeRoomId, type: 'snake_reset' });
+        resetMatch();
+    }
+}
+
+function executeEndGame(winnerRole) {
+    isSnakeActive = false;
+    clearInterval(snakeGameInterval);
+    
+    let resultMessage = "";
+    if (snakeRole === winnerRole) {
+        resultMessage = "¡VICTORIA! 🏆\nEl rival chocó 5 veces.";
+    } else {
+        resultMessage = "¡DERROTA! 💀\nHas alcanzado los 5 choques.";
+    }
+
+    setTimeout(() => {
+        alert(resultMessage);
+        window.location.reload();
+    }, 200);
 }
 
 socket.on('sync', (data) => {
     if (snakeRole === 'host' && data.type === 'guest_ate') { fruits.splice(data.index, 1); spawnFruit(); }
     if (snakeRole === 'host' && data.type === 'guest_crash') {
         p2.crashes++;
-        if (p2.crashes >= 5) endGame();
-        else { socket.emit('sync', { roomId: snakeRoomId, type: 'snake_reset' }); resetMatch(); }
+        checkFinalScore();
     }
 });
 
@@ -188,47 +221,28 @@ function draw() {
     document.getElementById('snake-hud').innerHTML = `P1: ${p1.crashes}/5 | P2: ${p2.crashes}/5 ${p1.powerUp>0 || p2.powerUp>0 ? '🌟' : ''}`;
 }
 
-function endGame() {
-    isSnakeActive = false;
-    clearInterval(snakeGameInterval);
-    alert("¡PARTIDA FINALIZADA!");
-    window.location.reload();
-}
-
-function changeDir(nx, ny) {
-    let my = (snakeRole === 'host') ? p1 : p2;
-    if (nx !== -my.dir.x || ny !== -my.dir.y) my.nextDir = { x: nx, y: ny };
-}
-
-// --- NUEVO SISTEMA DE CONTROL TOTAL ---
 function setupAllControls() {
-    // 1. Control por Teclado
     window.onkeydown = (e) => {
         if (e.key === "ArrowUp") changeDir(0, -1);
         if (e.key === "ArrowDown") changeDir(0, 1);
         if (e.key === "ArrowLeft") changeDir(-1, 0);
         if (e.key === "ArrowRight") changeDir(1, 0);
     };
-
-    // 2. Control por Click/Tap en Canvas (Dividido en 4 zonas)
     canvasS.onclick = (e) => {
         const rect = canvasS.getBoundingClientRect();
         const x = (e.clientX - rect.left) / rect.width;
         const y = (e.clientY - rect.top) / rect.height;
-        
-        if (y < 0.25) changeDir(0, -1);      // Click arriba
-        else if (y > 0.75) changeDir(0, 1);  // Click abajo
-        else if (x < 0.25) changeDir(-1, 0); // Click izquierda
-        else if (x > 0.75) changeDir(1, 0);  // Click derecha
+        if (y < 0.3) changeDir(0, -1);
+        else if (y > 0.7) changeDir(0, 1);
+        else if (x < 0.3) changeDir(-1, 0);
+        else if (x > 0.7) changeDir(1, 0);
     };
-
-    // 3. Swipe mejorado
     let sX, sY;
     canvasS.ontouchstart = (e) => { sX = e.touches[0].clientX; sY = e.touches[0].clientY; };
     canvasS.ontouchmove = (e) => {
         if (!sX || !sY) return;
         let dX = sX - e.touches[0].clientX, dY = sY - e.touches[0].clientY;
-        if (Math.abs(dX) > 10 || Math.abs(dY) > 10) {
+        if (Math.abs(dX) > 20 || Math.abs(dY) > 20) {
             if (Math.abs(dX) > Math.abs(dY)) {
                 if (dX > 0) changeDir(-1, 0); else changeDir(1, 0);
             } else {
@@ -237,4 +251,9 @@ function setupAllControls() {
             sX = null; sY = null;
         }
     };
+}
+
+function changeDir(nx, ny) {
+    let my = (snakeRole === 'host') ? p1 : p2;
+    if (nx !== -my.dir.x || ny !== -my.dir.y) my.nextDir = { x: nx, y: ny };
 }
