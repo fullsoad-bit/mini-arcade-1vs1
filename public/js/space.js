@@ -1,6 +1,6 @@
 let spCanvas, spCtx, spRoomId, spRole, spActive = false;
-let spP1 = { x: 200, y: 530, hp: 100, color: "#39FF14", b: [] };
-let spP2 = { x: 200, y: 70, hp: 100, color: "#FF00FF", b: [] };
+let spP1 = { x: 200, y: 530, hp: 1000, color: "#39FF14", b: [] };
+let spP2 = { x: 200, y: 70, hp: 1000, color: "#FF00FF", b: [] };
 let spMeteors = [], spBoss = { active: false, x: 200, y: -100, hp: 500, b: [] };
 let spTimer = 0, spJoy = { active: false, dx: 0 }, spLoop;
 
@@ -13,7 +13,7 @@ function startSpace(roomId, isHost) {
     spRoomId = roomId.toString();
     spRole = isHost ? 'host' : 'guest';
     spActive = true;
-    spTimer = 0; spP1.hp = 100; spP2.hp = 100; spP1.b = []; spP2.b = []; spMeteors = [];
+    spTimer = 0; spP1.hp = 1000; spP2.hp = 1000; spP1.b = []; spP2.b = []; spMeteors = [];
     spBoss = { active: false, x: 200, y: -100, hp: 500, b: [] };
 
     const container = document.getElementById('game-container');
@@ -46,11 +46,20 @@ function runSpace() {
         bul.y += (spRole === 'host') ? -12 : 12;
         if (bul.y < 0 || bul.y > 600) my.b.splice(i, 1);
         
-        // CORRECCIÓN: 20 de daño = 5 disparos para morir
+        // Colisión con rival (20 de daño)
         if (Math.abs(bul.x - rival.x) < 25 && Math.abs(bul.y - rival.y) < 25) {
             if (spRole === 'host') spP2.hp -= 20; else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_p1'});
             my.b.splice(i, 1);
         }
+
+        // Colisión con meteoritos (Destruibles)
+        spMeteors.forEach((m, mi) => {
+            if (Math.abs(bul.x - m.x) < 20 && Math.abs(bul.y - m.y) < 20) {
+                if (spRole === 'host') spMeteors.splice(mi, 1);
+                my.b.splice(i, 1);
+            }
+        });
+
         if (spBoss.active && Math.abs(bul.x - spBoss.x) < 40 && Math.abs(bul.y - spBoss.y) < 40) {
             if (spRole === 'host') spBoss.hp -= 2; else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_boss'});
             my.b.splice(i, 1);
@@ -61,7 +70,6 @@ function runSpace() {
         spTimer += 0.03;
         if (spTimer > 45 && !spBoss.active) spBoss.active = true;
         
-        // Lógica del Boss
         if (spBoss.active && spBoss.hp > 0) {
             if (spBoss.y < 250) spBoss.y += 1.5;
             spBoss.x = 200 + Math.sin(spTimer) * 100;
@@ -72,23 +80,19 @@ function runSpace() {
         spBoss.b.forEach((bb, i) => {
             bb.x += bb.vx; bb.y += bb.vy;
             if (bb.x < 0 || bb.x > 400 || bb.y < 0 || bb.y > 600) spBoss.b.splice(i, 1);
-            [spP1, spP2].forEach(p => { if (Math.abs(bb.x - p.x) < 20 && Math.abs(bb.y - p.y) < 20) { p.hp -= 4; spBoss.b.splice(i, 1); } });
+            [spP1, spP2].forEach(p => { if (Math.abs(bb.x - p.x) < 20 && Math.abs(bb.y - p.y) < 20) { p.hp -= 15; spBoss.b.splice(i, 1); } });
         });
 
-        // CORRECCIÓN: Meteoritos desde el medio (Y=300) hacia ambos lados
+        // Meteoritos desde el centro
         if (Math.random() < 0.04) {
-            spMeteors.push({ 
-                x: Math.random()*400, 
-                y: 300, 
-                s: (Math.random() > 0.5 ? 1 : -1) * (Math.random()*3+2) 
-            });
+            spMeteors.push({ x: Math.random()*400, y: 300, s: (Math.random() > 0.5 ? 1 : -1) * (Math.random()*3+2) });
         }
         spMeteors.forEach((m, i) => {
             m.y += m.s; 
             if (m.y > 600 || m.y < 0) spMeteors.splice(i, 1);
             [spP1, spP2].forEach(p => { 
                 if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { 
-                    p.hp -= 10; // Meteorito quita media vida de un disparo
+                    p.hp -= 40; // Meteoritos quitan 40hp
                     spMeteors.splice(i, 1); 
                 } 
             });
@@ -110,6 +114,23 @@ function drawSp() {
     // Meteoros
     spMeteors.forEach(m => { spCtx.fillStyle = "#555"; spCtx.beginPath(); spCtx.arc(m.x, m.y, 14, 0, Math.PI*2); spCtx.fill(); });
 
+    // Barras de Vida Estilo Arcade
+    const drawHealthBar = (x, y, hp, color, label) => {
+        spCtx.fillStyle = "#333";
+        spCtx.fillRect(x, y, 150, 12);
+        spCtx.fillStyle = color;
+        spCtx.fillRect(x, y, (Math.max(0, hp) / 1000) * 150, 12);
+        spCtx.strokeStyle = "#fff";
+        spCtx.lineWidth = 1;
+        spCtx.strokeRect(x, y, 150, 12);
+        spCtx.fillStyle = "#fff";
+        spCtx.font = "bold 9px Arial";
+        spCtx.fillText(label + ": " + Math.max(0, hp), x, y - 5);
+    };
+
+    drawHealthBar(20, 580, spP1.hp, "#39FF14", "VIDA P1");
+    drawHealthBar(230, 30, spP2.hp, "#FF00FF", "VIDA P2");
+
     // Boss Alien
     if (spBoss.active && spBoss.hp > 0) {
         spCtx.save();
@@ -126,7 +147,11 @@ function drawSp() {
         spCtx.beginPath(); spCtx.ellipse(-15, -5, 10, 15, Math.PI/4, 0, Math.PI * 2); spCtx.fill();
         spCtx.beginPath(); spCtx.ellipse(15, -5, 10, 15, -Math.PI/4, 0, Math.PI * 2); spCtx.fill();
         spCtx.restore();
-        spCtx.fillStyle = "white"; spCtx.fillRect(spBoss.x-40, spBoss.y-50, (spBoss.hp/500)*80, 4);
+        
+        // Barra Vida Boss
+        spCtx.fillStyle = "red";
+        spCtx.fillRect(spBoss.x-40, spBoss.y-50, (spBoss.hp/500)*80, 6);
+        
         spBoss.b.forEach(bb => { spCtx.fillStyle = "#ff0"; spCtx.beginPath(); spCtx.arc(bb.x, bb.y, 4, 0, Math.PI*2); spCtx.fill(); });
     }
 
@@ -141,8 +166,6 @@ function drawSp() {
         }
         spCtx.fill();
     });
-    
-    document.getElementById('space-hud').innerHTML = `VIDA P1: ${Math.max(0, spP1.hp)}% | VIDA P2: ${Math.max(0, spP2.hp)}%`;
 }
 
 function setupSpControls(cont) {
@@ -154,10 +177,8 @@ function setupSpControls(cont) {
     
     const moveJoy = (e) => {
         e.preventDefault();
-        const touch = e.touches[0];
-        const rect = jBase.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        let dx = (touch.clientX - centerX) / (rect.width / 2);
+        const r = jBase.getBoundingClientRect();
+        let dx = (e.touches[0].clientX - (r.left + 50)) / 50;
         spJoy.dx = Math.max(-1, Math.min(1, dx));
         spJoy.active = true;
         jStick.style.transform = `translateX(${spJoy.dx * 25}px)`;
@@ -179,7 +200,10 @@ function setupSpControls(cont) {
 }
 
 socket.on('sync', (data) => {
-    if (spRole === 'host') { if(data.type === 'sp_hit_p1') spP1.hp -= 20; if(data.type === 'sp_hit_boss') spBoss.hp -= 2; }
+    if (spRole === 'host') { 
+        if(data.type === 'sp_hit_p1') spP1.hp -= 20; 
+        if(data.type === 'sp_hit_boss') spBoss.hp -= 2; 
+    }
 });
 
 window.onkeydown = (e) => {
@@ -191,4 +215,3 @@ window.onkeydown = (e) => {
     }
 };
 window.onkeyup = () => { spJoy.active = false; spJoy.dx = 0; };
-
