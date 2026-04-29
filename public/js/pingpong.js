@@ -2,7 +2,8 @@
 let ppCanvas, ppCtx, ppRoomId, ppRole, ppActive = false;
 let ppUser = { x: 0, y: 160, score: 0 };
 let ppOpponent = { x: 0, y: 160, score: 0 };
-let ppBall = { x: 0, y: 0, speedX: 4, speedY: 4, radius: 7 };
+// CAMBIO: Velocidad base reducida a 3
+let ppBall = { x: 0, y: 0, speedX: 3, speedY: 3, radius: 7 };
 
 const PP_PADDLE_W = 12, PP_PADDLE_H = 80;
 
@@ -24,7 +25,8 @@ function startPingPong(roomId, isHost) {
     // 3. Posiciones iniciales
     ppUser = { x: (ppRole === 'host' ? 0 : ppCanvas.width - PP_PADDLE_W), y: 160, score: 0 };
     ppOpponent = { x: (ppRole === 'host' ? ppCanvas.width - PP_PADDLE_W : 0), y: 160, score: 0 };
-    ppBall = { x: ppCanvas.width / 2, y: ppCanvas.height / 2, speedX: 5, speedY: 5, radius: 7 };
+    // CAMBIO: Velocidad inicial reducida a 3
+    ppBall = { x: ppCanvas.width / 2, y: ppCanvas.height / 2, speedX: 3, speedY: 3, radius: 7 };
 
     // 4. Limpiar y montar UI
     const container = document.getElementById('game-container');
