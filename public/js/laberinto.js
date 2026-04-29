@@ -17,10 +17,7 @@ let timerPrey = 15;
 let mazeTimerInterval;
 
 let berry = { x: -100, y: -100, active: false };
-let speedTimeout = null;
-
-// JOYSTICK VARIABLES
-let joystick = { active: false, baseX: 0, baseY: 0, stickX: 0, stickY: 0, dx: 0, dy: 0 };
+let joystick = { active: false, dx: 0, dy: 0 };
 
 const mazeLayout = [
     [1,1,1,1,1,1,1,1,1,1],
@@ -48,21 +45,27 @@ function startLaberinto(roomId, isHost) {
     const container = document.getElementById('game-container');
     container.innerHTML = "";
     container.appendChild(canvasL);
-    
-    // Iniciar nuevo sistema de Joystick
     setupJoystick(container);
 
     socket.off('sync');
     socket.on('sync', (data) => {
-        if (!isMazeActive || data.type !== 'maze_sync') return;
-        if (mazeRole === 'host') {
-            player2.x = data.px; player2.y = data.py;
-        } else {
-            player1.x = data.px; player1.y = data.py;
-            player1.role = data.p1Role; player2.role = data.p2Role;
-            player1.score = data.p1Score; player2.score = data.p2Score;
-            timerPrey = data.timer; berry = data.berry;
-            if (data.reset) resetPositions();
+        if (!isMazeActive) return;
+
+        if (data.type === 'maze_sync') {
+            if (mazeRole === 'host') {
+                player2.x = data.px; player2.y = data.py;
+            } else {
+                player1.x = data.px; player1.y = data.py;
+                player1.role = data.p1Role; player2.role = data.p2Role;
+                player1.score = data.p1Score; player2.score = data.p2Score;
+                timerPrey = data.timer; berry = data.berry;
+                if (data.reset) resetPositions();
+            }
+        }
+        
+        // CORRECCIÓN: Escuchar el final del juego siendo Guest
+        if (data.type === 'maze_end') {
+            showEndMessage(data.winner);
         }
     });
 
@@ -80,17 +83,6 @@ function resetPositions() {
     player2.x = POS_ORIGINAL.p2.x; player2.y = POS_ORIGINAL.p2.y;
     player1.speed = 4; player2.speed = 4;
     timerPrey = 15;
-}
-
-function broadcastMaze(didReset = false) {
-    let my = (mazeRole === 'host') ? player1 : player2;
-    socket.emit('sync', {
-        roomId: mazeRoomId, type: 'maze_sync',
-        px: my.x, py: my.y,
-        p1Role: player1.role, p2Role: player2.role,
-        p1Score: player1.score, p2Score: player2.score,
-        timer: timerPrey, berry: berry, reset: didReset
-    });
 }
 
 function logicTick() {
@@ -114,20 +106,39 @@ function swapRoles() {
 }
 
 function checkWinCondition() {
-    if (player1.score >= 3 || player2.score >= 3) {
-        isMazeActive = false;
-        clearInterval(mazeTimerInterval);
-        let winner = player1.score >= 3 ? "JUGADOR 1 (HOST)" : "JUGADOR 2 (GUEST)";
-        alert(`🏆 ¡FIN DEL JUEGO! 🏆\n${winner}`);
-        window.location.reload();
+    if (mazeRole === 'host' && (player1.score >= 3 || player2.score >= 3)) {
+        let winnerName = player1.score >= 3 ? "JUGADOR 1 (HOST)" : "JUGADOR 2 (GUEST)";
+        socket.emit('sync', { roomId: mazeRoomId, type: 'maze_end', winner: winnerName });
+        showEndMessage(winnerName);
     }
 }
 
-function spawnBerry() {
-    berry = { x: Math.floor(Math.random() * 8 + 1) * TILE_SIZE + 20, y: Math.floor(Math.random() * 8 + 1) * TILE_SIZE + 20, active: true };
+// CORRECCIÓN: Función de fin de juego para ambos
+function showEndMessage(winner) {
+    isMazeActive = false;
+    clearInterval(mazeTimerInterval);
+    setTimeout(() => {
+        alert(`🏆 ¡PARTIDA TERMINADA! 🏆\nGanador: ${winner}`);
+        window.location.reload();
+    }, 100);
 }
 
-// Bucle de movimiento suave
+// CORRECCIÓN: Spawn solo en caminos (ceros)
+function spawnBerry() {
+    let validSpots = [];
+    for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+            if (mazeLayout[r][c] === 0) validSpots.push({c, r});
+        }
+    }
+    let spot = validSpots[Math.floor(Math.random() * validSpots.length)];
+    berry = { 
+        x: spot.c * TILE_SIZE + 20, 
+        y: spot.r * TILE_SIZE + 20, 
+        active: true 
+    };
+}
+
 function updateMovement() {
     if (!isMazeActive || !joystick.active) return;
 
@@ -135,7 +146,6 @@ function updateMovement() {
     let nextX = my.x + (joystick.dx * my.speed);
     let nextY = my.y + (joystick.dy * my.speed);
 
-    // Colisión mejorada con muros
     const margin = 12;
     const canMove = (nx, ny) => {
         let checkPoints = [{x: nx-margin, y: ny-margin}, {x: nx+margin, y: ny-margin}, {x: nx-margin, y: ny+margin}, {x: nx+margin, y: ny+margin}];
@@ -148,13 +158,11 @@ function updateMovement() {
 
     if (canMove(nextX, nextY)) {
         my.x = nextX; my.y = nextY;
-    } else if (canMove(nextX, my.y)) {
-        my.x = nextX; // Deslizar en X
-    } else if (canMove(my.x, nextY)) {
-        my.y = nextY; // Deslizar en Y
+    } else {
+        if (canMove(nextX, my.y)) my.x = nextX;
+        if (canMove(my.x, nextY)) my.y = nextY;
     }
 
-    // Captura (Host detecta)
     if (mazeRole === 'host') {
         let dist = Math.sqrt(Math.pow(player1.x - player2.x, 2) + Math.pow(player1.y - player2.y, 2));
         if (dist < 28) {
@@ -163,7 +171,6 @@ function updateMovement() {
         }
     }
 
-    // Item velocidad
     if (berry.active) {
         let dF = Math.sqrt(Math.pow(my.x - berry.x, 2) + Math.pow(my.y - berry.y, 2));
         if (dF < 22) {
@@ -173,6 +180,19 @@ function updateMovement() {
         }
     }
     broadcastMaze();
+}
+
+function broadcastMaze(didReset = false) {
+    if (mazeRole === 'host' || !didReset) {
+        let my = (mazeRole === 'host') ? player1 : player2;
+        socket.emit('sync', {
+            roomId: mazeRoomId, type: 'maze_sync',
+            px: my.x, py: my.y,
+            p1Role: player1.role, p2Role: player2.role,
+            p1Score: player1.score, p2Score: player2.score,
+            timer: timerPrey, berry: berry, reset: didReset
+        });
+    }
 }
 
 function renderMaze() {
@@ -205,7 +225,7 @@ function renderMaze() {
     ctxL.fillRect(0,0,400,35);
     ctxL.fillStyle = "white";
     ctxL.font = "bold 13px Arial";
-    ctxL.fillText(`⏱️ ESCAPE: ${timerPrey}s | P1: ${player1.score} | P2: ${player2.score}`, 10, 22);
+    ctxL.fillText(`⏱️ ${timerPrey}s | P1: ${player1.score} | P2: ${player2.score}`, 10, 22);
 
     requestAnimationFrame(renderMaze);
 }
@@ -217,39 +237,37 @@ function drawPlayer(p) {
     ctxL.fillText(p.role === "cazador" ? "🐱" : "🐭", p.x, p.y);
 }
 
-// --- SISTEMA DE JOYSTICK ---
 function setupJoystick(cont) {
     const joyContainer = document.createElement('div');
-    joyContainer.style.cssText = "width:150px; height:150px; background:rgba(255,255,255,0.1); border:3px solid #39FF14; border-radius:50%; margin:20px auto; position:relative; touch-action:none;";
+    joyContainer.style.cssText = "width:120px; height:120px; background:rgba(255,255,255,0.1); border:2px solid #39FF14; border-radius:50%; margin:15px auto; position:relative; touch-action:none;";
     
     const stick = document.createElement('div');
-    stick.style.cssText = "width:60px; height:60px; background:#FF00FF; border-radius:50%; position:absolute; top:45px; left:45px; box-shadow:0 0 15px #FF00FF;";
+    stick.style.cssText = "width:50px; height:50px; background:#FF00FF; border-radius:50%; position:absolute; top:35px; left:35px; box-shadow:0 0 10px #FF00FF;";
     
     joyContainer.appendChild(stick);
     cont.appendChild(joyContainer);
 
     const handleTouch = (e) => {
         e.preventDefault();
-        const touch = e.touches[0];
-        const rect = joyContainer.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
+        const t = e.touches[0];
+        const r = joyContainer.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
         
-        let diffX = touch.clientX - centerX;
-        let diffY = touch.clientY - centerY;
-        let distance = Math.sqrt(diffX*diffX + diffY*diffY);
-        let maxDist = 50;
+        let dx = t.clientX - cx;
+        let dy = t.clientY - cy;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        let max = 40;
 
-        if (distance > maxDist) {
-            diffX = (diffX / distance) * maxDist;
-            diffY = (diffY / distance) * maxDist;
+        if (dist > max) {
+            dx = (dx / dist) * max;
+            dy = (dy / dist) * max;
         }
 
-        joystick.dx = diffX / maxDist;
-        joystick.dy = diffY / maxDist;
+        joystick.dx = dx / max;
+        joystick.dy = dy / max;
         joystick.active = true;
-        
-        stick.style.transform = `translate(${diffX}px, ${diffY}px)`;
+        stick.style.transform = `translate(${dx}px, ${dy}px)`;
     };
 
     joyContainer.addEventListener('touchstart', handleTouch);
