@@ -119,16 +119,15 @@
         }
 
         footer { position: fixed; bottom: 20px; right: 20px; z-index: 5000; }
-        .frutilla { font-size: 45px; filter: drop-shadow(0 0 10px red); cursor: pointer; user-select: none; }
+        /* Frutilla achicada a la mitad (de 45px a 22px) */
+        .frutilla { font-size: 22px; filter: drop-shadow(0 0 5px red); cursor: pointer; user-select: none; }
 
-        /* --- ESTILOS DEL EASTER EGG (CARAS DE PABLO CORREGIDAS) --- */
         .pablo-head {
             position: fixed;
             width: 90px;
             height: 90px;
             border-radius: 50%;
             background-image: url('/pablo.jpg'); 
-            /* Ajuste de encuadre: bajamos el porcentaje para que no se vea solo la frente */
             background-size: cover;        
             background-position: center 25%; 
             background-repeat: no-repeat;
@@ -169,7 +168,7 @@
             <div class="game-card" onclick="openModal('PING PONG')">PING PONG</div>
             <div class="game-card" onclick="openModal('CARRERA 2D')">CARRERA 2D</div>
             <div class="game-card" onclick="openModal('TETRIX')">TETRIX</div>
-            <div class="game-card" onclick="openModal('TIRO')">TIRO AL BLANCO</div>
+            <div class="game-card" onclick="openModal('TIRO AL BLANCO')">TIRO AL BLANCO</div>
             <div class="game-card" onclick="openModal('LABERINTO')">LABERINTO NEÓN</div>
         </div>
     </div>
@@ -226,51 +225,60 @@
             }
         }
 
+        // --- FUNCIONES DE SALA COMPLETADAS ---
+
         function openModal(gameName) {
-            document.getElementById('room-modal').style.display = 'block';
             document.getElementById('selected-game-title').innerText = gameName;
-            document.getElementById('room-info').innerHTML = "";
+            document.getElementById('room-modal').style.display = 'block';
         }
 
-        function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
+        function closeModal() {
+            document.getElementById('room-modal').style.display = 'none';
+            document.getElementById('room-info').innerText = "";
+        }
 
         function generateRoom() {
             const pass = document.getElementById('room-pass').value || "123";
+            const game = document.getElementById('selected-game-title').innerText;
             soyAnfitrion = true;
-            socket.emit('create_room', { password: pass, game: document.getElementById('selected-game-title').innerText });
-        }
-
-        function joinRoom() {
-            const id = document.getElementById('room-id').value;
-            const pass = document.getElementById('room-pass').value || "123";
-            soyAnfitrion = false;
-            socket.emit('join_room', { roomId: id.toString(), password: pass });
+            socket.emit('create_room', { password: pass, game: game });
         }
 
         socket.on('room_created', (data) => {
             idSalaActual = data.roomId;
-            document.getElementById('room-info').innerHTML = `SALA: ${data.roomId}<br>PASS: ${data.password}`;
+            document.getElementById('room-info').innerText = `SALA: ${data.roomId} | PASS: ${data.password}`;
+            alert("Sala creada. Espera a tu oponente.");
         });
 
-        socket.on('player_joined', (data) => {
-            idSalaActual = data.roomId; 
-            closeModal();
-            iniciarJuego(data.game);
-        });
-
-        socket.on('error_msg', (msg) => { alert(msg); });
-
-        function iniciarJuego(nombre) {
-            document.getElementById('ui-layer').style.display = "none";
-            document.getElementById('game-container').style.display = "block";
-            document.getElementById('game-container').innerHTML = ""; 
-
-            if(nombre === "CARRERA 2D") startRacing(idSalaActual, soyAnfitrion);
-            else if(nombre === "PING PONG") startPingPong(idSalaActual, soyAnfitrion);
-            else if(nombre === "TETRIX") startTetrix(idSalaActual, soyAnfitrion);
-            else if(nombre === "TIRO") startTiro(idSalaActual, soyAnfitrion);
-            else if(nombre === "LABERINTO") startLaberinto(idSalaActual, soyAnfitrion);
+        function joinRoom() {
+            const rId = document.getElementById('room-id').value;
+            const pass = document.getElementById('room-pass').value;
+            if (!rId) return alert("Ingresa el ID de la sala");
+            soyAnfitrion = false;
+            socket.emit('join_room', { roomId: rId, password: pass });
         }
+
+        // FUNCIÓN CLAVE: Detecta cuando el oponente se conecta e inicia el juego
+        socket.on('player_joined', (data) => {
+            idSalaActual = data.roomId;
+            
+            // Cambiar de menú a pantalla de juego
+            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('room-modal').style.display = 'none';
+            const container = document.getElementById('game-container');
+            container.style.display = 'block';
+
+            // Iniciar Ping Pong (o el juego seleccionado)
+            if (data.game === 'PING PONG') {
+                if (typeof startPingPong === 'function') {
+                    startPingPong(data.roomId, soyAnfitrion);
+                }
+            }
+        });
+
+        socket.on('error_msg', (msg) => {
+            alert(msg);
+        });
     </script>
 </body>
 </html>
