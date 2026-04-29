@@ -6,34 +6,21 @@
     <title>MINI 1vs1 | Arcade Online</title>
     <link href="https://googleapis.com" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
-    <script>const socket = io();</script>
-
-    <!-- Scripts de Juegos -->
-    <script src="/js/pingpong.js?v=dexter_final"></script>
-    <script src="/js/carrera.js?v=dexter_final"></script>
-    <script src="/js/tetrix.js?v=dexter_final"></script>
-    <script src="/js/tiro.js?v=dexter_final"></script>
-    <script src="/js/laberinto.js?v=dexter_final"></script>
-    <script src="/js/snake.js?v=dexter_final"></script>
-    <script src="/js/space.js?v=dexter_final"></script>
-    
     <style>
         :root { --neon-green: #39FF14; --neon-pink: #FF00FF; --bg-color: #0d0208; }
-        body { background-color: var(--bg-color); color: var(--neon-green); font-family: 'Roboto', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; touch-action: manipulation; overflow-x: hidden;}
+        body { background-color: var(--bg-color); color: var(--neon-green); font-family: 'Roboto', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; touch-action: manipulation; overflow-x: hidden; }
         #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; padding-bottom: 100px; }
-        #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; }
-        h1 { font-family: 'Press Start 2P', cursive; font-size: 2.2rem; color: var(--neon-pink); margin-top: 50px; text-shadow: 4px 4px 0px #000; text-align: center; }
-        .subtitle { font-family: 'Press Start 2P', cursive; font-size: 0.8rem; color: #fff; margin-bottom: 40px; background: rgba(0,0,0,0.7); padding: 8px 15px; border: 1px solid var(--neon-pink); border-radius: 5px; }
+        #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; min-height: 400px; }
+        h1 { font-family: 'Press Start 2P', cursive; font-size: 2rem; color: var(--neon-pink); margin-top: 50px; text-shadow: 4px 4px 0px #000; text-align: center; }
+        .subtitle { font-family: 'Press Start 2P', cursive; font-size: 0.7rem; color: #fff; margin-bottom: 40px; background: rgba(0,0,0,0.7); padding: 8px 15px; border: 1px solid var(--neon-pink); border-radius: 5px; }
         .game-grid { display: grid; grid-template-columns: 1fr; gap: 20px; width: 90%; max-width: 500px; }
-        .game-card { font-family: 'Press Start 2P', cursive; border: 4px solid var(--neon-green); padding: 25px 10px; text-align: center; cursor: pointer; background: #000; transition: 0.2s; font-size: 1rem; color: var(--neon-green); text-shadow: 2px 2px 0px #000; }
-        .game-card:hover { background-color: var(--neon-green); color: black; text-shadow: none; }
-        #room-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 5px solid var(--neon-pink); padding: 30px; z-index: 2000; width: 90%; max-width: 400px; text-align: center; }
-        input { background: #111; border: 3px solid var(--neon-green); color: #fff; padding: 15px; margin: 10px 0; width: 85%; text-align: center; font-size: 1.5rem; font-weight: bold; }
-        .btn { background: var(--neon-pink); color: white; border: none; padding: 20px; font-family: 'Press Start 2P', cursive; cursor: pointer; width: 100%; margin-top: 15px; }
+        .game-card { font-family: 'Press Start 2P', cursive; border: 4px solid var(--neon-green); padding: 25px 10px; text-align: center; cursor: pointer; background: #000; transition: 0.2s; font-size: 0.9rem; color: var(--neon-green); }
+        .game-card:hover { background-color: var(--neon-green); color: black; }
+        #room-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 5px solid var(--neon-pink); padding: 30px; z-index: 2000; width: 85%; max-width: 400px; text-align: center; }
+        input { background: #111; border: 3px solid var(--neon-green); color: #fff; padding: 12px; margin: 10px 0; width: 80%; text-align: center; font-size: 1.2rem; }
+        .btn { background: var(--neon-pink); color: white; border: none; padding: 15px; font-family: 'Press Start 2P', cursive; cursor: pointer; width: 100%; margin-top: 15px; font-size: 0.8rem; }
         footer { position: fixed; bottom: 20px; right: 20px; z-index: 5000; }
-        .frutilla { font-size: 22px; filter: drop-shadow(0 0 5px red); cursor: pointer; user-select: none; }
-        .pablo-head { position: fixed; width: 90px; height: 90px; border-radius: 50%; background-image: url('/pablo.jpg'); background-size: cover; background-position: center 25%; border: 3px solid var(--neon-pink); z-index: 9999; animation: floatMove 8s infinite ease-in-out; }
-        @keyframes floatMove { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-60px, 240px); } }
+        .frutilla { font-size: 22px; cursor: pointer; filter: drop-shadow(0 0 5px red); }
     </style>
 </head>
 <body>
@@ -52,32 +39,28 @@
     </div>
     <div id="game-container"></div>
     <div id="room-modal">
-        <h2 id="selected-game-title" style="font-family: 'Press Start 2P'; color: var(--neon-pink);">JUEGO</h2>
+        <h2 id="selected-game-title" style="font-family: 'Press Start 2P'; color: var(--neon-pink); font-size: 1rem;">SALA</h2>
         <button class="btn" onclick="generateRoom()">CREAR SALA</button>
-        <div id="room-info" style="margin-top:20px; color:#39FF14; font-size:1.2rem;"></div>
-        <hr style="border: 0; border-top: 2px solid #333; margin: 25px 0;">
+        <div id="room-info" style="margin-top:20px; color:#39FF14; font-size:1rem;"></div>
+        <hr style="border: 0; border-top: 2px solid #333; margin: 20px 0;">
         <input type="number" id="room-id" placeholder="ID SALA">
-        <input type="text" id="room-pass" placeholder="PASS" value="123">
+        <input type="text" id="room-pass" placeholder="123" value="123">
         <button class="btn" onclick="joinRoom()">UNIRSE</button>
-        <p onclick="closeModal()" style="cursor:pointer; color: #ff4d4d; margin-top: 25px;">[ CANCELAR ]</p>
+        <p onclick="closeModal()" style="cursor:pointer; color: #ff4d4d; margin-top: 20px; font-family: 'Press Start 2P'; font-size: 0.6rem;">[ CANCELAR ]</p>
     </div>
-    <footer><div class="frutilla" onclick="handleStrawberryClick()">🍓</div></footer>
+    <footer><div class="frutilla" onclick="alert('¡Gracias por jugar!')">🍓</div></footer>
+
+    <script>const socket = io();</script>
+    <script src="/js/pingpong.js?v=2"></script>
+    <script src="/js/carrera.js?v=2"></script>
+    <script src="/js/tetrix.js?v=2"></script>
+    <script src="/js/tiro.js?v=2"></script>
+    <script src="/js/laberinto.js?v=2"></script>
+    <script src="/js/snake.js?v=2"></script>
+    <script src="/js/space.js?v=2"></script>
 
     <script>
-        let soyAnfitrion = false, idSalaActual = null, clicksFrutilla = 0, timerFrutilla;
-        function handleStrawberryClick() {
-            clicksFrutilla++;
-            clearTimeout(timerFrutilla);
-            if (clicksFrutilla === 3) { spawnPablos(); clicksFrutilla = 0; }
-            else { timerFrutilla = setTimeout(() => { clicksFrutilla = 0; alert('¡Gracias por jugar!'); }, 500); }
-        }
-        function spawnPablos() {
-            for (let i = 0; i < 5; i++) {
-                const head = document.createElement('div'); head.className = 'pablo-head';
-                head.style.left = Math.random() * 70 + 'vw'; head.style.top = Math.random() * 70 + 'vh';
-                head.onclick = function() { this.remove(); }; document.body.appendChild(head);
-            }
-        }
+        let soyAnfitrion = false;
         function openModal(gameName) { document.getElementById('selected-game-title').innerText = gameName; document.getElementById('room-modal').style.display = 'block'; }
         function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
         function generateRoom() {
@@ -85,16 +68,13 @@
             const game = document.getElementById('selected-game-title').innerText;
             soyAnfitrion = true; socket.emit('create_room', { password: pass, game: game });
         }
-        socket.on('room_created', (data) => {
-            document.getElementById('room-info').innerText = `SALA: ${data.roomId} | PASS: ${data.password}`;
-        });
+        socket.on('room_created', (data) => { document.getElementById('room-info').innerText = `ID: ${data.roomId} | PASS: ${data.password}`; });
         function joinRoom() {
             const rId = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
             soyAnfitrion = false; socket.emit('join_room', { roomId: rId, password: pass });
         }
         socket.on('player_joined', (data) => {
-            idSalaActual = data.roomId;
             document.getElementById('ui-layer').style.display = 'none';
             document.getElementById('room-modal').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
@@ -108,11 +88,10 @@
                     'SNAKE 1vs1': typeof startSnake !== 'undefined' ? startSnake : null,
                     'SPACE SHOOTER': typeof startSpace !== 'undefined' ? startSpace : null
                 };
-                const launcher = inits[data.game];
-                if (launcher) launcher(data.roomId, soyAnfitrion);
-            }, 200);
+                if (inits[data.game]) inits[data.game](data.roomId, soyAnfitrion);
+            }, 300);
         });
-        socket.on('error_msg', (msg) => { alert(msg); });
+        socket.on('error_msg', (msg) => alert(msg));
     </script>
 </body>
 </html>
