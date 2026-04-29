@@ -119,7 +119,6 @@
         }
 
         footer { position: fixed; bottom: 20px; right: 20px; z-index: 5000; }
-        /* Frutilla achicada a la mitad (de 45px a 22px) */
         .frutilla { font-size: 22px; filter: drop-shadow(0 0 5px red); cursor: pointer; user-select: none; }
 
         .pablo-head {
@@ -169,7 +168,7 @@
             <div class="game-card" onclick="openModal('CARRERA 2D')">CARRERA 2D</div>
             <div class="game-card" onclick="openModal('TETRIX')">TETRIX</div>
             <div class="game-card" onclick="openModal('TIRO AL BLANCO')">TIRO AL BLANCO</div>
-            <div class="game-card" onclick="openModal('LABERINTO')">LABERINTO NEÓN</div>
+            <div class="game-card" onclick="openModal('LABERINTO NEÓN')">LABERINTO NEÓN</div>
         </div>
     </div>
 
@@ -225,8 +224,6 @@
             }
         }
 
-        // --- FUNCIONES DE SALA COMPLETADAS ---
-
         function openModal(gameName) {
             document.getElementById('selected-game-title').innerText = gameName;
             document.getElementById('room-modal').style.display = 'block';
@@ -247,38 +244,40 @@
         socket.on('room_created', (data) => {
             idSalaActual = data.roomId;
             document.getElementById('room-info').innerText = `SALA: ${data.roomId} | PASS: ${data.password}`;
-            alert("Sala creada. Espera a tu oponente.");
         });
 
         function joinRoom() {
             const rId = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
-            if (!rId) return alert("Ingresa el ID de la sala");
+            if (!rId) return alert("Pon el ID de la sala");
             soyAnfitrion = false;
             socket.emit('join_room', { roomId: rId, password: pass });
         }
 
-        // FUNCIÓN CLAVE: Detecta cuando el oponente se conecta e inicia el juego
         socket.on('player_joined', (data) => {
             idSalaActual = data.roomId;
-            
-            // Cambiar de menú a pantalla de juego
             document.getElementById('ui-layer').style.display = 'none';
             document.getElementById('room-modal').style.display = 'none';
-            const container = document.getElementById('game-container');
-            container.style.display = 'block';
+            document.getElementById('game-container').style.display = 'block';
 
-            // Iniciar Ping Pong (o el juego seleccionado)
-            if (data.game === 'PING PONG') {
-                if (typeof startPingPong === 'function') {
-                    startPingPong(data.roomId, soyAnfitrion);
-                }
+            // Diccionario dinámico para iniciar cualquier juego
+            const inits = {
+                'PING PONG': typeof startPingPong !== 'undefined' ? startPingPong : null,
+                'CARRERA 2D': typeof startCarrera !== 'undefined' ? startCarrera : null,
+                'TETRIX': typeof startTetrix !== 'undefined' ? startTetrix : null,
+                'TIRO AL BLANCO': typeof startTiro !== 'undefined' ? startTiro : null,
+                'LABERINTO NEÓN': typeof startLaberinto !== 'undefined' ? startLaberinto : null
+            };
+
+            const launcher = inits[data.game];
+            if (launcher) {
+                launcher(data.roomId, soyAnfitrion);
+            } else {
+                console.error("No se encontró la función de inicio para: " + data.game);
             }
         });
 
-        socket.on('error_msg', (msg) => {
-            alert(msg);
-        });
+        socket.on('error_msg', (msg) => { alert(msg); });
     </script>
 </body>
 </html>
