@@ -1,16 +1,16 @@
-const canvasSp = document.createElement('canvas');
-const ctxSp = canvasSp.getContext('2d');
-canvasSp.width = 400; canvasSp.height = 600;
-canvasSp.style.cssText = "background:#00050a; border:4px solid #00f0ff; display:block; margin:auto; max-width:95vw; height:auto; touch-action:none;";
-
-let spaceRoomId = null, spaceRole = "", isSpaceActive = false;
+let canvasSp, ctxSp, spaceRoomId, spaceRole, isSpaceActive = false;
 let p1 = { x: 200, y: 530, hp: 100, color: "#39FF14", bullets: [] };
 let p2 = { x: 200, y: 70, hp: 100, color: "#FF00FF", bullets: [] };
-let meteors = [];
-let boss = { active: false, x: 200, y: -100, hp: 500, bullets: [] };
+let meteors = [], boss = { active: false, x: 200, y: -100, hp: 500, bullets: [] };
 let gameTimer = 0, joy = { active: false, dx: 0 }, spaceInterval;
 
 function startSpace(roomId, isHost) {
+    // 1. Crear el Canvas dinámicamente para evitar que esté vacío
+    canvasSp = document.createElement('canvas');
+    ctxSp = canvasSp.getContext('2d');
+    canvasSp.width = 400; canvasSp.height = 600;
+    canvasSp.style.cssText = "background:#00050a; border:4px solid #00f0ff; display:block; margin:auto; max-width:95vw; height:auto; touch-action:none;";
+
     spaceRoomId = roomId.toString();
     spaceRole = isHost ? 'host' : 'guest';
     isSpaceActive = true;
@@ -18,7 +18,8 @@ function startSpace(roomId, isHost) {
     boss = { active: false, x: 200, y: -100, hp: 500, bullets: [] };
 
     const container = document.getElementById('game-container');
-    container.innerHTML = ""; container.appendChild(canvasSp);
+    container.innerHTML = ""; 
+    container.appendChild(canvasSp);
     setupSpaceControls(container);
 
     socket.off('sync');
@@ -54,9 +55,10 @@ function spaceLoop() {
 
     if (spaceRole === 'host') {
         gameTimer += 0.03;
-        if (gameTimer > 45 && !boss.active && boss.hp > 0) boss.active = true;
-        if (boss.active) {
-            if (boss.y < 250) boss.y += 2; boss.x = 200 + Math.sin(gameTimer) * 100;
+        if (gameTimer > 45 && !boss.active) boss.active = true;
+        if (boss.active && boss.hp > 0) {
+            if (boss.y < 200) boss.y += 2; 
+            boss.x = 200 + Math.sin(gameTimer) * 100;
             if (Math.random() < 0.05) { for(let a=0; a<Math.PI*2; a+=Math.PI/4) boss.bullets.push({x: boss.x, y: boss.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5}); }
         }
         boss.bullets.forEach((bb, i) => {
@@ -69,7 +71,11 @@ function spaceLoop() {
             m.y += m.s; if (m.y > 600) meteors.splice(i, 1);
             [p1, p2].forEach(p => { if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { p.hp -= 3; meteors.splice(i, 1); } });
         });
-        if (p1.hp <= 0 || p2.hp <= 0 || boss.hp <= 0) { isSpaceActive = false; setTimeout(() => { alert("FIN DE DUELO"); window.location.reload(); }, 500); }
+        if (p1.hp <= 0 || p2.hp <= 0 || (boss.active && boss.hp <= 0)) { 
+            isSpaceActive = false; 
+            alert("FIN DEL DUELO"); 
+            window.location.reload(); 
+        }
     }
     socket.emit('sync', { roomId: spaceRoomId, type: 'space_sync', px: my.x, pBullets: my.bullets, meteors, p1Hp: p1.hp, p2Hp: p2.hp, boss, timer: gameTimer });
     drawSpace();
@@ -80,12 +86,11 @@ socket.on('sync', (data) => {
 });
 
 function drawSpace() {
-    ctxSp.fillStyle = (gameTimer > 40 && gameTimer < 45 && Math.floor(gameTimer*5)%2==0) ? "#200" : "#00050a";
+    ctxSp.fillStyle = (gameTimer > 40 && gameTimer < 45 && Math.floor(gameTimer*5)%2==0) ? "#300" : "#00050a";
     ctxSp.fillRect(0, 0, 400, 600);
-    meteors.forEach(m => { ctxSp.fillStyle = "#555"; ctxSp.beginPath(); ctxSp.arc(m.x, m.y, 15, 0, Math.PI*2); ctxSp.fill(); });
-    if (boss.active) {
+    meteors.forEach(m => { ctxSp.fillStyle = "#666"; ctxSp.beginPath(); ctxSp.arc(m.x, m.y, 15, 0, Math.PI*2); ctxSp.fill(); });
+    if (boss.active && boss.hp > 0) {
         ctxSp.fillStyle = "red"; ctxSp.fillRect(boss.x-50, boss.y-30, 100, 60);
-        ctxSp.fillStyle = "#fff"; ctxSp.fillRect(boss.x-40, boss.y-45, (boss.hp/500)*80, 5);
         boss.bullets.forEach(bb => { ctxSp.fillStyle = "#ff0"; ctxSp.beginPath(); ctxSp.arc(bb.x, bb.y, 4, 0, Math.PI*2); ctxSp.fill(); });
     }
     [p1, p2].forEach(p => {
@@ -95,7 +100,6 @@ function drawSpace() {
         else { ctxSp.moveTo(p.x, p.y+20); ctxSp.lineTo(p.x-15, p.y-10); ctxSp.lineTo(p.x+15, p.y-10); }
         ctxSp.fill();
     });
-    document.getElementById('space-hud').innerHTML = `P1: ${Math.max(0, p1.hp)}% | P2: ${Math.max(0, p2.hp)}% ${boss.active ? '⚠️ BOSS' : ''}`;
 }
 
 function setupSpaceControls(cont) {
@@ -104,7 +108,7 @@ function setupSpaceControls(cont) {
     const jStick = document.createElement('div'); jStick.style.cssText = "width:40px; height:40px; background:#00f0ff; border-radius:50%; position:absolute; top:30px; left:30px;";
     jBase.ontouchmove = (e) => { e.preventDefault(); joy.active = true; let dx = (e.touches[0].clientX - (jBase.getBoundingClientRect().left + 50)) / 50; joy.dx = Math.max(-1, Math.min(1, dx)); jStick.style.transform = `translateX(${joy.dx * 25}px)`; };
     jBase.ontouchend = () => { joy.active = false; jStick.style.transform = "translateX(0)"; };
-    const btnS = document.createElement('button'); btnS.innerHTML = "🔫"; btnS.style.cssText = "width:85px; height:85px; background:red; border-radius:50%; color:white; font-size:35px;";
+    const btnS = document.createElement('button'); btnS.innerHTML = "🔫"; btnS.style.cssText = "width:85px; height:85px; background:red; border-radius:50%; color:white; font-size:35px; border:none;";
     btnS.onclick = () => { let my = (spaceRole === 'host') ? p1 : p2; if (my.bullets.length < 6) my.bullets.push({ x: my.x, y: my.y + (spaceRole === 'host' ? -30 : 30) }); };
     jBase.appendChild(jStick); ui.appendChild(jBase); ui.appendChild(btnS); cont.appendChild(ui);
 }
