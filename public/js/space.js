@@ -1,114 +1,126 @@
-let canvasSp, ctxSp, spaceRoomId, spaceRole, isSpaceActive = false;
-let p1 = { x: 200, y: 530, hp: 100, color: "#39FF14", bullets: [] };
-let p2 = { x: 200, y: 70, hp: 100, color: "#FF00FF", bullets: [] };
-let meteors = [], boss = { active: false, x: 200, y: -100, hp: 500, bullets: [] };
-let gameTimer = 0, joy = { active: false, dx: 0 }, spaceInterval;
+// Variables globales únicas para este archivo
+let spCanvas, spCtx, spRoomId, spRole, spActive = false;
+let spP1 = { x: 200, y: 530, hp: 100, color: "#39FF14", b: [] };
+let spP2 = { x: 200, y: 70, hp: 100, color: "#FF00FF", b: [] };
+let spMeteors = [], spBoss = { active: false, x: 200, y: -100, hp: 500, b: [] };
+let spTimer = 0, spJoy = { active: false, dx: 0 }, spLoop;
 
 function startSpace(roomId, isHost) {
-    // 1. Crear el Canvas dinámicamente para evitar que esté vacío
-    canvasSp = document.createElement('canvas');
-    ctxSp = canvasSp.getContext('2d');
-    canvasSp.width = 400; canvasSp.height = 600;
-    canvasSp.style.cssText = "background:#00050a; border:4px solid #00f0ff; display:block; margin:auto; max-width:95vw; height:auto; touch-action:none;";
+    // Crear canvas
+    spCanvas = document.createElement('canvas');
+    spCtx = spCanvas.getContext('2d');
+    spCanvas.width = 400; spCanvas.height = 600;
+    spCanvas.style.cssText = "background:#00050a; border:4px solid #00f0ff; display:block; margin:auto; max-width:95vw; height:auto; touch-action:none;";
 
-    spaceRoomId = roomId.toString();
-    spaceRole = isHost ? 'host' : 'guest';
-    isSpaceActive = true;
-    gameTimer = 0; p1.hp = 100; p2.hp = 100; p1.bullets = []; p2.bullets = []; meteors = [];
-    boss = { active: false, x: 200, y: -100, hp: 500, bullets: [] };
+    spRoomId = roomId.toString();
+    spRole = isHost ? 'host' : 'guest';
+    spActive = true;
+    
+    // Reset estado
+    spTimer = 0; spP1.hp = 100; spP2.hp = 100; spP1.b = []; spP2.b = []; spMeteors = [];
+    spBoss = { active: false, x: 200, y: -100, hp: 500, b: [] };
 
     const container = document.getElementById('game-container');
     container.innerHTML = ""; 
-    container.appendChild(canvasSp);
-    setupSpaceControls(container);
+    container.appendChild(spCanvas);
+    
+    // Setup Controles
+    setupSpControls(container);
 
     socket.off('sync');
     socket.on('sync', (data) => {
-        if (!isSpaceActive || data.type !== 'space_sync') return;
-        if (spaceRole === 'host') { p2.x = data.px; p2.bullets = data.pBullets; }
-        else { p1.x = data.px; p1.bullets = data.pBullets; meteors = data.meteors; p1.hp = data.p1Hp; p2.hp = data.p2Hp; boss = data.boss; gameTimer = data.timer; }
+        if (!spActive || data.type !== 'sp_sync') return;
+        if (spRole === 'host') {
+            spP2.x = data.px; spP2.b = data.pb;
+        } else {
+            spP1.x = data.px; spP1.b = data.pb;
+            spMeteors = data.met; spP1.hp = data.p1h; spP2.hp = data.p2h;
+            spBoss = data.bos; spTimer = data.tm;
+        }
     });
 
-    if (spaceInterval) clearInterval(spaceInterval);
-    spaceInterval = setInterval(spaceLoop, 30);
+    if (spLoop) clearInterval(spLoop);
+    spLoop = setInterval(runSpace, 30);
 }
 
-function spaceLoop() {
-    if (!isSpaceActive) return;
-    let my = (spaceRole === 'host') ? p1 : p2;
-    let rival = (spaceRole === 'host') ? p2 : p1;
+function runSpace() {
+    if (!spActive) return;
+    let my = (spRole === 'host') ? spP1 : spP2;
+    let rival = (spRole === 'host') ? spP2 : spP1;
 
-    if (joy.active) { my.x += joy.dx * 8; my.x = Math.max(20, Math.min(380, my.x)); }
+    // Mover mi nave
+    if (spJoy.active) { my.x += spJoy.dx * 7; my.x = Math.max(20, Math.min(380, my.x)); }
 
-    my.bullets.forEach((b, i) => {
-        b.y += (spaceRole === 'host') ? -12 : 12;
-        if (b.y < 0 || b.y > 600) my.bullets.splice(i, 1);
-        if (Math.abs(b.x - rival.x) < 25 && Math.abs(b.y - rival.y) < 25) {
-            if (spaceRole === 'host') p2.hp -= 5; else socket.emit('sync', {roomId: spaceRoomId, type: 'hit_p1'});
-            my.bullets.splice(i, 1);
+    // Balas
+    my.b.forEach((bul, i) => {
+        bul.y += (spRole === 'host') ? -10 : 10;
+        if (bul.y < 0 || bul.y > 600) my.b.splice(i, 1);
+        if (Math.abs(bul.x - rival.x) < 25 && Math.abs(bul.y - rival.y) < 25) {
+            if (spRole === 'host') spP2.hp -= 5; else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_p1'});
+            my.b.splice(i, 1);
         }
-        if (boss.active && Math.abs(b.x - boss.x) < 50 && Math.abs(b.y - boss.y) < 40) {
-            if (spaceRole === 'host') boss.hp -= 2; else socket.emit('sync', {roomId: spaceRoomId, type: 'hit_boss'});
-            my.bullets.splice(i, 1);
+        if (spBoss.active && Math.abs(bul.x - spBoss.x) < 50 && Math.abs(bul.y - spBoss.y) < 40) {
+            if (spRole === 'host') spBoss.hp -= 2; else socket.emit('sync', {roomId: spRoomId, type: 'sp_hit_boss'});
+            my.b.splice(i, 1);
         }
     });
 
-    if (spaceRole === 'host') {
-        gameTimer += 0.03;
-        if (gameTimer > 45 && !boss.active) boss.active = true;
-        if (boss.active && boss.hp > 0) {
-            if (boss.y < 200) boss.y += 2; 
-            boss.x = 200 + Math.sin(gameTimer) * 100;
-            if (Math.random() < 0.05) { for(let a=0; a<Math.PI*2; a+=Math.PI/4) boss.bullets.push({x: boss.x, y: boss.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5}); }
+    if (spRole === 'host') {
+        spTimer += 0.03;
+        if (spTimer > 45 && !spBoss.active) spBoss.active = true;
+        if (spBoss.active && spBoss.hp > 0) {
+            if (spBoss.y < 200) spBoss.y += 1.5;
+            spBoss.x = 200 + Math.sin(spTimer) * 100;
+            if (Math.random() < 0.04) {
+                for(let a=0; a<Math.PI*2; a+=Math.PI/4) spBoss.b.push({x: spBoss.x, y: spBoss.y, vx: Math.cos(a)*4, vy: Math.sin(a)*4});
+            }
         }
-        boss.bullets.forEach((bb, i) => {
+        spBoss.b.forEach((bb, i) => {
             bb.x += bb.vx; bb.y += bb.vy;
-            if (bb.x < 0 || bb.x > 400 || bb.y < 0 || bb.y > 600) boss.bullets.splice(i, 1);
-            [p1, p2].forEach(p => { if (Math.abs(bb.x - p.x) < 20 && Math.abs(bb.y - p.y) < 20) { p.hp -= 4; boss.bullets.splice(i, 1); } });
+            if (bb.x < 0 || bb.x > 400 || bb.y < 0 || bb.y > 600) spBoss.b.splice(i, 1);
+            [spP1, spP2].forEach(p => { if (Math.abs(bb.x - p.x) < 20 && Math.abs(bb.y - p.y) < 20) { p.hp -= 3; spBoss.b.splice(i, 1); } });
         });
-        if (Math.random() < 0.04) meteors.push({ x: Math.random()*400, y: 0, s: Math.random()*3+2 });
-        meteors.forEach((m, i) => {
-            m.y += m.s; if (m.y > 600) meteors.splice(i, 1);
-            [p1, p2].forEach(p => { if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { p.hp -= 3; meteors.splice(i, 1); } });
+        if (Math.random() < 0.04) spMeteors.push({ x: Math.random()*400, y: 0, s: Math.random()*2+2 });
+        spMeteors.forEach((m, i) => {
+            m.y += m.s; if (m.y > 600) spMeteors.splice(i, 1);
+            [spP1, spP2].forEach(p => { if (Math.abs(m.x - p.x) < 25 && Math.abs(m.y - p.y) < 25) { p.hp -= 2; spMeteors.splice(i, 1); } });
         });
-        if (p1.hp <= 0 || p2.hp <= 0 || (boss.active && boss.hp <= 0)) { 
-            isSpaceActive = false; 
-            alert("FIN DEL DUELO"); 
-            window.location.reload(); 
+        if (spP1.hp <= 0 || spP2.hp <= 0 || (spBoss.active && spBoss.hp <= 0)) {
+            spActive = false; alert("FIN DEL COMBATE"); window.location.reload();
         }
     }
-    socket.emit('sync', { roomId: spaceRoomId, type: 'space_sync', px: my.x, pBullets: my.bullets, meteors, p1Hp: p1.hp, p2Hp: p2.hp, boss, timer: gameTimer });
-    drawSpace();
+    socket.emit('sync', { roomId: spRoomId, type: 'sp_sync', px: my.x, pb: my.b, met: spMeteors, p1h: spP1.hp, p2h: spP2.hp, bos: spBoss, tm: spTimer });
+    drawSp();
 }
 
 socket.on('sync', (data) => {
-    if (spaceRole === 'host') { if(data.type === 'hit_p1') p1.hp -= 5; if(data.type === 'hit_boss') boss.hp -= 2; }
+    if (spRole === 'host') { if(data.type === 'sp_hit_p1') spP1.hp -= 5; if(data.type === 'sp_hit_boss') spBoss.hp -= 2; }
 });
 
-function drawSpace() {
-    ctxSp.fillStyle = (gameTimer > 40 && gameTimer < 45 && Math.floor(gameTimer*5)%2==0) ? "#300" : "#00050a";
-    ctxSp.fillRect(0, 0, 400, 600);
-    meteors.forEach(m => { ctxSp.fillStyle = "#666"; ctxSp.beginPath(); ctxSp.arc(m.x, m.y, 15, 0, Math.PI*2); ctxSp.fill(); });
-    if (boss.active && boss.hp > 0) {
-        ctxSp.fillStyle = "red"; ctxSp.fillRect(boss.x-50, boss.y-30, 100, 60);
-        boss.bullets.forEach(bb => { ctxSp.fillStyle = "#ff0"; ctxSp.beginPath(); ctxSp.arc(bb.x, bb.y, 4, 0, Math.PI*2); ctxSp.fill(); });
+function drawSp() {
+    spCtx.fillStyle = (spTimer > 40 && spTimer < 45 && Math.floor(spTimer*5)%2==0) ? "#400" : "#00050a";
+    spCtx.fillRect(0, 0, 400, 600);
+    spMeteors.forEach(m => { spCtx.fillStyle = "#666"; spCtx.beginPath(); spCtx.arc(m.x, m.y, 12, 0, Math.PI*2); spCtx.fill(); });
+    if (spBoss.active && spBoss.hp > 0) {
+        spCtx.fillStyle = "red"; spCtx.fillRect(spBoss.x-40, spBoss.y-25, 80, 50);
+        spBoss.b.forEach(bb => { spCtx.fillStyle = "#ff0"; spCtx.beginPath(); spCtx.arc(bb.x, bb.y, 3, 0, Math.PI*2); spCtx.fill(); });
     }
-    [p1, p2].forEach(p => {
-        p.bullets.forEach(b => { ctxSp.fillStyle = "#0ff"; ctxSp.fillRect(b.x-2, b.y-10, 4, 15); });
-        ctxSp.fillStyle = p.color; ctxSp.beginPath();
-        if (p === p1) { ctxSp.moveTo(p.x, p.y-20); ctxSp.lineTo(p.x-15, p.y+10); ctxSp.lineTo(p.x+15, p.y+10); }
-        else { ctxSp.moveTo(p.x, p.y+20); ctxSp.lineTo(p.x-15, p.y-10); ctxSp.lineTo(p.x+15, p.y-10); }
-        ctxSp.fill();
+    [spP1, spP2].forEach(p => {
+        p.b.forEach(b => { spCtx.fillStyle = "#0ff"; spCtx.fillRect(b.x-1.5, b.y-8, 3, 12); });
+        spCtx.fillStyle = p.color; spCtx.beginPath();
+        if (p === spP1) { spCtx.moveTo(p.x, p.y-18); spCtx.lineTo(p.x-12, p.y+8); spCtx.lineTo(p.x+12, p.y+8); }
+        else { spCtx.moveTo(p.x, p.y+18); spCtx.lineTo(p.x-12, p.y-8); spCtx.lineTo(p.x+12, p.y-8); }
+        spCtx.fill();
     });
 }
 
-function setupSpaceControls(cont) {
+function setupSpControls(cont) {
     const ui = document.createElement('div'); ui.style.cssText = "display:flex; justify-content:space-around; align-items:center; width:100%; margin-top:15px;";
-    const jBase = document.createElement('div'); jBase.style.cssText = "width:100px; height:100px; background:rgba(0,240,255,0.1); border:2px solid #00f0ff; border-radius:50%; position:relative; touch-action:none;";
-    const jStick = document.createElement('div'); jStick.style.cssText = "width:40px; height:40px; background:#00f0ff; border-radius:50%; position:absolute; top:30px; left:30px;";
-    jBase.ontouchmove = (e) => { e.preventDefault(); joy.active = true; let dx = (e.touches[0].clientX - (jBase.getBoundingClientRect().left + 50)) / 50; joy.dx = Math.max(-1, Math.min(1, dx)); jStick.style.transform = `translateX(${joy.dx * 25}px)`; };
-    jBase.ontouchend = () => { joy.active = false; jStick.style.transform = "translateX(0)"; };
-    const btnS = document.createElement('button'); btnS.innerHTML = "🔫"; btnS.style.cssText = "width:85px; height:85px; background:red; border-radius:50%; color:white; font-size:35px; border:none;";
-    btnS.onclick = () => { let my = (spaceRole === 'host') ? p1 : p2; if (my.bullets.length < 6) my.bullets.push({ x: my.x, y: my.y + (spaceRole === 'host' ? -30 : 30) }); };
+    const jBase = document.createElement('div'); jBase.style.cssText = "width:90px; height:90px; background:rgba(0,240,255,0.1); border:2px solid #00f0ff; border-radius:50%; position:relative; touch-action:none;";
+    const jStick = document.createElement('div'); jStick.style.cssText = "width:35px; height:35px; background:#00f0ff; border-radius:50%; position:absolute; top:27px; left:27px;";
+    jBase.ontouchmove = (e) => { e.preventDefault(); spJoy.active = true; let dx = (e.touches[0].clientX - (jBase.getBoundingClientRect().left + 45)) / 45; spJoy.dx = Math.max(-1, Math.min(1, dx)); jStick.style.transform = `translateX(${spJoy.dx * 20}px)`; };
+    jBase.ontouchend = () => { spJoy.active = false; jStick.style.transform = "translateX(0)"; };
+    const btnS = document.createElement('button'); btnS.innerHTML = "🚀"; btnS.style.cssText = "width:80px; height:80px; background:red; border-radius:50%; color:white; font-size:30px; border:none;";
+    btnS.onclick = () => { let my = (spRole === 'host') ? spP1 : spP2; if (my.b.length < 5) my.b.push({ x: my.x, y: my.y + (spRole === 'host' ? -25 : 25) }); };
     jBase.appendChild(jStick); ui.appendChild(jBase); ui.appendChild(btnS); cont.appendChild(ui);
 }
