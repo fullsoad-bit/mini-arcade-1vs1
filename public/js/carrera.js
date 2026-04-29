@@ -14,7 +14,8 @@ let racingSpeed = 7;
 let timeLeft = 60;
 let timerInt, obsInt;
 
-function startRacing(roomId, isHost) {
+// CAMBIO: El nombre ahora coincide con el index.html
+function startCarrera(roomId, isHost) {
     if (!roomId) return console.error("Error: RoomId nulo");
     
     racingRoomId = roomId.toString();
@@ -22,15 +23,25 @@ function startRacing(roomId, isHost) {
     isRacingActive = true;
     obstacles = [];
     timeLeft = 60;
+    
+    // Reiniciar posiciones y choques
+    carHost = { x: 100, y: 480, color: "#39FF14", stun: 0, crashes: 0 };
+    carGuest = { x: 260, y: 480, color: "#FF00FF", stun: 0, crashes: 0 };
 
     const container = document.getElementById('game-container');
     container.innerHTML = "";
+    
+    // Título de modo
+    const info = document.createElement('div');
+    info.style.cssText = "color:#fff; font-family:'Press Start 2P'; font-size:10px; margin-bottom:10px;";
+    info.innerText = `MODO: ${racingRole.toUpperCase()}`;
+    container.appendChild(info);
+    
     container.appendChild(canvasRacing);
 
     if (/Android|iPhone/i.test(navigator.userAgent)) setupMobileControls(container);
 
-    // CONFIGURAR ESCUCHADOR DENTRO DEL INICIO
-    socket.off('sync'); // Limpiar escuchadores viejos
+    socket.off('sync'); 
     socket.on('sync', (data) => {
         if (!isRacingActive) return;
         if (data.type === 'move') {
@@ -49,8 +60,8 @@ function startRacing(roomId, isHost) {
 
     if (timerInt) clearInterval(timerInt);
     timerInt = setInterval(() => {
-        if (timeLeft > 0) timeLeft--;
-        else endRacing();
+        if (isRacingActive && timeLeft > 0) timeLeft--;
+        else if (timeLeft <= 0) endRacing();
     }, 1000);
 
     if (isHost) {
@@ -60,7 +71,8 @@ function startRacing(roomId, isHost) {
         }, 900);
     }
 
-    renderRacing();
+    // Iniciar el bucle de dibujo
+    requestAnimationFrame(renderRacing);
 }
 
 function movePlayer(dir) {
@@ -76,7 +88,17 @@ function movePlayer(dir) {
 
 function renderRacing() {
     if (!isRacingActive) return;
-    ctxRacing.clearRect(0, 0, 400, 600);
+    
+    ctxRacing.fillStyle = "#000";
+    ctxRacing.fillRect(0, 0, 400, 600);
+
+    // Líneas de carretera para dar efecto de movimiento
+    ctxRacing.strokeStyle = "#333";
+    ctxRacing.setLineDash([20, 20]);
+    ctxRacing.lineWidth = 5;
+    ctxRacing.beginPath();
+    ctxRacing.moveTo(200, 0); ctxRacing.lineTo(200, 600);
+    ctxRacing.stroke();
 
     if (racingRole === 'host') {
         obstacles.forEach(o => o.y += racingSpeed);
@@ -85,8 +107,10 @@ function renderRacing() {
     }
 
     obstacles.forEach(o => {
-        ctxRacing.fillStyle = "#FF0000";
+        ctxRacing.fillStyle = "#FF0000"; // Obstáculos rojos
         ctxRacing.fillRect(o.x, o.y, 40, 40);
+        
+        // Colisión solo la detecta cada uno para su propio auto
         let my = (racingRole === 'host') ? carHost : carGuest;
         if (my.stun <= 0 && my.x < o.x + 40 && my.x + 40 > o.x && my.y < o.y + 40 && my.y + 70 > o.y) {
             my.stun = 40;
@@ -98,10 +122,14 @@ function renderRacing() {
     drawCar(carHost);
     drawCar(carGuest);
 
+    // UI de tiempo y choques
     ctxRacing.fillStyle = "white";
-    ctxRacing.font = "16px Monospace";
-    ctxRacing.fillText(`⏱️ ${timeLeft}s`, 10, 25);
-    ctxRacing.fillText(`P1: ${carHost.crashes} | P2: ${carGuest.crashes}`, 10, 50);
+    ctxRacing.font = "bold 16px Arial";
+    ctxRacing.fillText(`⏱️ Tiempo: ${timeLeft}s`, 10, 30);
+    ctxRacing.fillStyle = "#39FF14";
+    ctxRacing.fillText(`P1 (Host): ${carHost.crashes}`, 10, 55);
+    ctxRacing.fillStyle = "#FF00FF";
+    ctxRacing.fillText(`P2 (Guest): ${carGuest.crashes}`, 10, 80);
 
     requestAnimationFrame(renderRacing);
 }
@@ -113,13 +141,24 @@ function drawCar(c) {
     }
     ctxRacing.fillStyle = c.color;
     ctxRacing.fillRect(c.x, c.y, 40, 70);
+    // Detalles del auto (luces)
+    ctxRacing.fillStyle = "yellow";
+    ctxRacing.fillRect(c.x + 5, c.y + 5, 5, 5);
+    ctxRacing.fillRect(c.x + 30, c.y + 5, 5, 5);
 }
 
 function endRacing() {
+    if (!isRacingActive) return;
     isRacingActive = false;
     clearInterval(timerInt);
     clearInterval(obsInt);
-    alert("CARRERA FINALIZADA");
+    
+    let winner = "";
+    if (carHost.crashes < carGuest.crashes) winner = "¡GANÓ EL HOST (VERDE)!";
+    else if (carGuest.crashes < carHost.crashes) winner = "¡GANÓ EL GUEST (ROSA)!";
+    else winner = "¡EMPATE!";
+    
+    alert(`FIN DE LA CARRERA\n${winner}\nHost: ${carHost.crashes} choques\nGuest: ${carGuest.crashes} choques`);
     window.location.reload();
 }
 
