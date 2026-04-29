@@ -6,7 +6,6 @@
     <title>MINI 1vs1 | Arcade Online</title>
     <link href="https://googleapis.com" rel="stylesheet">
     
-    <!-- 1. Librería Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
 
     <style>
@@ -117,13 +116,21 @@
             background-position: center 25%; 
             border: 3px solid var(--neon-pink);
             z-index: 9999;
-            animation: floatMove 8s infinite ease-in-out;
+            cursor: pointer;
+            box-shadow: 0 0 20px var(--neon-pink);
+            animation: floatMove 8s infinite ease-in-out, rotateSlow 6s infinite linear;
         }
 
         @keyframes floatMove {
             0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(60px, 120px); }
             50% { transform: translate(-60px, 240px); }
+            75% { transform: translate(120px, 60px); }
         }
+
+        @keyframes rotateSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .explode { transform: scale(4) !important; opacity: 0 !important; transition: all 0.4s ease-out; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -157,9 +164,8 @@
         <p onclick="closeModal()" style="cursor:pointer; color: #ff4d4d; margin-top: 25px; font-family: 'Press Start 2P'; font-size: 0.8rem;">[ CANCELAR ]</p>
     </div>
 
-    <footer><div class="frutilla" onclick="alert('¡Gracias por jugar con nosotros!')">🍓</div></footer>
+    <footer><div class="frutilla" onclick="handleStrawberryClick()">🍓</div></footer>
 
-    <!-- CARGA DE SCRIPTS -->
     <script>const socket = io();</script>
     <script src="/js/pingpong.js"></script>
     <script src="/js/carrera.js"></script>
@@ -172,6 +178,34 @@
     <script>
         let soyAnfitrion = false;
         let idSalaActual = null;
+        let clicksFrutilla = 0;
+        let timerFrutilla;
+
+        // --- RESTAURADO: EASTER EGG DE PABLO ---
+        function handleStrawberryClick() {
+            clicksFrutilla++;
+            clearTimeout(timerFrutilla);
+            if (clicksFrutilla === 3) {
+                spawnPablos();
+                clicksFrutilla = 0;
+            } else {
+                timerFrutilla = setTimeout(() => { clicksFrutilla = 0; alert('¡Gracias por jugar!'); }, 500);
+            }
+        }
+
+        function spawnPablos() {
+            for (let i = 0; i < 7; i++) {
+                const head = document.createElement('div');
+                head.className = 'pablo-head';
+                head.style.left = Math.random() * 70 + 'vw';
+                head.style.top = Math.random() * 70 + 'vh';
+                head.onclick = function() {
+                    this.classList.add('explode');
+                    setTimeout(() => { this.remove(); }, 400);
+                };
+                document.body.appendChild(head);
+            }
+        }
 
         function openModal(gameName) {
             document.getElementById('selected-game-title').innerText = gameName;
@@ -205,19 +239,15 @@
             document.getElementById('room-modal').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
             
-            // Retraso de seguridad para asegurar que el archivo JS esté cargado
             setTimeout(() => {
-                const inits = {
-                    'PING PONG': typeof startPingPong !== 'undefined' ? startPingPong : null,
-                    'CARRERA 2D': typeof startCarrera !== 'undefined' ? startCarrera : null,
-                    'TETRIX': typeof startTetrix !== 'undefined' ? startTetrix : null,
-                    'TIRO AL BLANCO': typeof startTiro !== 'undefined' ? startTiro : null,
-                    'LABERINTO NEÓN': typeof startLaberinto !== 'undefined' ? startLaberinto : null,
-                    'SNAKE 1vs1': typeof startSnake !== 'undefined' ? startSnake : null,
-                    'SPACE SHOOTER': typeof startSpace !== 'undefined' ? startSpace : null
-                };
-                const launcher = inits[data.game];
-                if (launcher) launcher(data.roomId, soyAnfitrion);
+                const game = data.game;
+                if (game === 'PING PONG') startPingPong(data.roomId, soyAnfitrion);
+                else if (game === 'CARRERA 2D') startCarrera(data.roomId, soyAnfitrion);
+                else if (game === 'TETRIX') startTetrix(data.roomId, soyAnfitrion);
+                else if (game === 'TIRO AL BLANCO') startTiro(data.roomId, soyAnfitrion);
+                else if (game === 'LABERINTO NEÓN') startLaberinto(data.roomId, soyAnfitrion);
+                else if (game === 'SNAKE 1vs1') startSnake(data.roomId, soyAnfitrion);
+                else if (game === 'SPACE SHOOTER') startSpace(data.roomId, soyAnfitrion);
             }, 300);
         });
 
