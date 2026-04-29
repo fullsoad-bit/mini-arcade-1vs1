@@ -212,6 +212,7 @@
             }
         }
 
+        // Lógica de interfaz y comunicación
         function openModal(gameName) {
             document.getElementById('selected-game-title').innerText = gameName;
             document.getElementById('room-modal').style.display = 'block';
@@ -235,6 +236,7 @@
             socket.emit('joinRoom', { roomId, pass });
         }
 
+        // --- LISTENERS DE SOCKET ---
         socket.on('roomCreated', (data) => {
             idSalaActual = data.roomId;
             soyAnfitrion = true;
@@ -246,6 +248,7 @@
             document.getElementById('room-modal').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
             
+            // Estas funciones deben existir dentro de tus archivos /js/...
             if(data.game === 'PING PONG') startPingPong(socket, soyAnfitrion, data.roomId);
             if(data.game === 'CARRERA 2D') startCarrera(socket, soyAnfitrion, data.roomId);
             if(data.game === 'TETRIX') startTetrix(socket, soyAnfitrion, data.roomId);
@@ -256,21 +259,13 @@
         socket.on('error', (msg) => alert(msg));
     </script>
 
-    <!-- Google Analytics Protegido -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://googletagmanager.com"></script>
     <script>
-      try {
-        const script = document.createElement('script');
-        script.async = true;
-        script.src = "https://googletagmanager.com";
-        document.body.appendChild(script);
-
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-5M67DCZBD6');
-      } catch (e) {
-        console.warn("Analytics bloqueado por el navegador, continuando...");
-      }
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-5M67DCZBD6');
     </script>
 </body>
 </html>
