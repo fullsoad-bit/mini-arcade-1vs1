@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <!-- Google tag (gtag.js) -->
+    <!-- Google tag (gtag.js) - Analytics Integration -->
     <script async src="https://googletagmanager.com"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-5M67DCZBD6');
     </script>
 
@@ -191,7 +190,6 @@
         let clicksFrutilla = 0;
         let timerFrutilla;
 
-        // --- RESTAURADO: EASTER EGG DE PABLO ---
         function handleStrawberryClick() {
             clicksFrutilla++;
             clearTimeout(timerFrutilla);
@@ -225,8 +223,43 @@
         function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
 
         function generateRoom() {
-            // Aquí iría tu lógica de generación de sala que se cortó en el mensaje anterior
+            const pass = document.getElementById('room-pass').value || "123";
+            const game = document.getElementById('selected-game-title').innerText;
+            soyAnfitrion = true;
+            socket.emit('create_room', { password: pass, game: game });
         }
+
+        socket.on('room_created', (data) => {
+            idSalaActual = data.roomId;
+            document.getElementById('room-info').innerText = `ID: ${data.roomId} | PASS: ${data.password}`;
+        });
+
+        function joinRoom() {
+            const rId = document.getElementById('room-id').value;
+            const pass = document.getElementById('room-pass').value;
+            soyAnfitrion = false;
+            socket.emit('join_room', { roomId: rId, password: pass });
+        }
+
+        socket.on('player_joined', (data) => {
+            idSalaActual = data.roomId;
+            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('room-modal').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+            
+            setTimeout(() => {
+                const game = data.game;
+                if (game === 'PING PONG') startPingPong(data.roomId, soyAnfitrion);
+                else if (game === 'CARRERA 2D') startCarrera(data.roomId, soyAnfitrion);
+                else if (game === 'TETRIX') startTetrix(data.roomId, soyAnfitrion);
+                else if (game === 'TIRO AL BLANCO') startTiro(data.roomId, soyAnfitrion);
+                else if (game === 'LABERINTO NEÓN') startLaberinto(data.roomId, soyAnfitrion);
+                else if (game === 'SNAKE 1vs1') startSnake(data.roomId, soyAnfitrion);
+                else if (game === 'SPACE SHOOTER') startSpace(data.roomId, soyAnfitrion);
+            }, 300);
+        });
+
+        socket.on('error_msg', (msg) => { alert(msg); });
     </script>
 </body>
 </html>
