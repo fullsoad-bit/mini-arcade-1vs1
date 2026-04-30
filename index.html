@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MINI 1vs1 | Arcade Online</title>
     
-    <!-- Cargamos Socket.io primero para que esté disponible de inmediato -->
+    <!-- Prioridad 1: Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
 
     <style>
@@ -61,8 +61,26 @@
 
     <footer><div class="frutilla" onclick="handleStrawberryClick()">🍓</div></footer>
 
-    <!-- Lógica de Sockets y Juegos (Prioridad Máxima) -->
-    <script>const socket = io();</script>
+    <!-- Bloque de Conexión del Juego -->
+    <script>
+        const socket = io({ transports: ['websocket', 'polling'] });
+        
+        // Solo después de conectar el socket, iniciamos Analytics
+        socket.on('connect', () => {
+            console.log("Socket conectado. Iniciando Analytics...");
+            const gaScript = document.createElement('script');
+            gaScript.async = true;
+            gaScript.src = "https://googletagmanager.com";
+            document.head.appendChild(gaScript);
+
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-5M67DCZBD6');
+        });
+    </script>
+
+    <!-- Cargamos tus juegos -->
     <script src="/js/pingpong.js"></script>
     <script src="/js/carrera.js"></script>
     <script src="/js/tetrix.js"></script>
@@ -110,16 +128,16 @@
             idSalaActual = roomId;
             soyAnfitrion = true;
             document.getElementById('room-info').innerText = `SALA: ${roomId} | PASS: ${pass}`;
-            socket.emit('crearSala', { roomId, pass, game });
+            socket.emit('crearSala', { roomId: Number(roomId), pass, game });
         }
 
         function joinRoom() {
             const roomIdVal = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
             if(!roomIdVal) return alert("Pon el ID de la sala");
-            idSalaActual = parseInt(roomIdVal);
+            idSalaActual = Number(roomIdVal);
             soyAnfitrion = false;
-            socket.emit('unirseSala', { roomId: idSalaActual, pass: pass });
+            socket.emit('unirseSala', { roomId: idSalaActual, pass });
         }
 
         socket.on('empezarJuego', (data) => {
@@ -137,15 +155,6 @@
         });
 
         socket.on('errorSala', (msg) => { alert(msg); });
-    </script>
-
-    <!-- Google Analytics (Al final para que no interrumpa al juego) -->
-    <script async src="https://googletagmanager.com"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-5M67DCZBD6');
     </script>
 </body>
 </html>
