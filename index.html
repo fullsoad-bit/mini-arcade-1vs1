@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<!-- Google tag (gtag.js) - Analytics Integration -->
-<script async src="https://googletagmanager.com/gtag/js?id=G-5M67DCZBD6
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-5M67DCZBD6');
-</script>
+    <!-- Google tag (gtag.js) - Analytics Integration -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5M67DCZBD6"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-5M67DCZBD6');
+    </script>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -218,48 +218,49 @@
         function openModal(gameName) {
             document.getElementById('selected-game-title').innerText = gameName;
             document.getElementById('room-modal').style.display = 'block';
+            document.getElementById('room-info').innerText = '';
         }
 
-        function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
+        function closeModal() {
+            document.getElementById('room-modal').style.display = 'none';
+        }
 
         function generateRoom() {
-            const pass = document.getElementById('room-pass').value || "123";
             const game = document.getElementById('selected-game-title').innerText;
+            const roomId = Math.floor(1000 + Math.random() * 9000);
+            const pass = document.getElementById('room-pass').value || "123";
+            idSalaActual = roomId;
             soyAnfitrion = true;
-            socket.emit('create_room', { password: pass, game: game });
+            document.getElementById('room-info').innerText = `SALA: ${roomId} | PASS: ${pass}`;
+            socket.emit('crearSala', { roomId, pass, game });
         }
-
-        socket.on('room_created', (data) => {
-            idSalaActual = data.roomId;
-            document.getElementById('room-info').innerText = `ID: ${data.roomId} | PASS: ${data.password}`;
-        });
 
         function joinRoom() {
-            const rId = document.getElementById('room-id').value;
+            const roomId = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
+            if(!roomId) return alert("Pon el ID de la sala");
+            idSalaActual = roomId;
             soyAnfitrion = false;
-            socket.emit('join_room', { roomId: rId, password: pass });
+            socket.emit('unirseSala', { roomId, pass });
         }
 
-        socket.on('player_joined', (data) => {
-            idSalaActual = data.roomId;
+        socket.on('empezarJuego', (data) => {
             document.getElementById('ui-layer').style.display = 'none';
             document.getElementById('room-modal').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
             
-            setTimeout(() => {
-                const game = data.game;
-                if (game === 'PING PONG') startPingPong(data.roomId, soyAnfitrion);
-                else if (game === 'CARRERA 2D') startCarrera(data.roomId, soyAnfitrion);
-                else if (game === 'TETRIX') startTetrix(data.roomId, soyAnfitrion);
-                else if (game === 'TIRO AL BLANCO') startTiro(data.roomId, soyAnfitrion);
-                else if (game === 'LABERINTO NEÓN') startLaberinto(data.roomId, soyAnfitrion);
-                else if (game === 'SNAKE 1vs1') startSnake(data.roomId, soyAnfitrion);
-                else if (game === 'SPACE SHOOTER') startSpace(data.roomId, soyAnfitrion);
-            }, 300);
+            if(data.game === 'PING PONG') startPingPong(socket, idSalaActual, soyAnfitrion);
+            if(data.game === 'CARRERA 2D') startCarrera(socket, idSalaActual, soyAnfitrion);
+            if(data.game === 'TETRIX') startTetrix(socket, idSalaActual, soyAnfitrion);
+            if(data.game === 'TIRO AL BLANCO') startTiro(socket, idSalaActual, soyAnfitrion);
+            if(data.game === 'LABERINTO NEÓN') startLaberinto(socket, idSalaActual, soyAnfitrion);
+            if(data.game === 'SNAKE 1vs1') startSnake(socket, idSalaActual, soyAnfitrion);
+            if(data.game === 'SPACE SHOOTER') startSpace(socket, idSalaActual, soyAnfitrion);
         });
 
-        socket.on('error_msg', (msg) => { alert(msg); });
+        socket.on('errorSala', (msg) => {
+            alert(msg);
+        });
     </script>
 </body>
 </html>
