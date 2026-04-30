@@ -218,49 +218,48 @@
         function openModal(gameName) {
             document.getElementById('selected-game-title').innerText = gameName;
             document.getElementById('room-modal').style.display = 'block';
-            document.getElementById('room-info').innerText = '';
         }
 
-        function closeModal() {
-            document.getElementById('room-modal').style.display = 'none';
-        }
+        function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
 
         function generateRoom() {
-            const game = document.getElementById('selected-game-title').innerText;
-            const roomId = Math.floor(1000 + Math.random() * 9000);
             const pass = document.getElementById('room-pass').value || "123";
-            idSalaActual = roomId;
+            const game = document.getElementById('selected-game-title').innerText;
             soyAnfitrion = true;
-            document.getElementById('room-info').innerText = `SALA: ${roomId} | PASS: ${pass}`;
-            socket.emit('crearSala', { roomId, pass, game });
+            socket.emit('create_room', { password: pass, game: game });
         }
+
+        socket.on('room_created', (data) => {
+            idSalaActual = data.roomId;
+            document.getElementById('room-info').innerText = `ID: ${data.roomId} | PASS: ${data.password}`;
+        });
 
         function joinRoom() {
-            const roomId = document.getElementById('room-id').value;
+            const rId = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
-            if(!roomId) return alert("Pon el ID de la sala");
-            idSalaActual = roomId;
             soyAnfitrion = false;
-            socket.emit('unirseSala', { roomId, pass });
+            socket.emit('join_room', { roomId: rId, password: pass });
         }
 
-        socket.on('empezarJuego', (data) => {
+        socket.on('player_joined', (data) => {
+            idSalaActual = data.roomId;
             document.getElementById('ui-layer').style.display = 'none';
             document.getElementById('room-modal').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
             
-            if(data.game === 'PING PONG') startPingPong(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'CARRERA 2D') startCarrera(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'TETRIX') startTetrix(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'TIRO AL BLANCO') startTiro(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'LABERINTO NEÓN') startLaberinto(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'SNAKE 1vs1') startSnake(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'SPACE SHOOTER') startSpace(socket, idSalaActual, soyAnfitrion);
+            setTimeout(() => {
+                const game = data.game;
+                if (game === 'PING PONG') startPingPong(data.roomId, soyAnfitrion);
+                else if (game === 'CARRERA 2D') startCarrera(data.roomId, soyAnfitrion);
+                else if (game === 'TETRIX') startTetrix(data.roomId, soyAnfitrion);
+                else if (game === 'TIRO AL BLANCO') startTiro(data.roomId, soyAnfitrion);
+                else if (game === 'LABERINTO NEÓN') startLaberinto(data.roomId, soyAnfitrion);
+                else if (game === 'SNAKE 1vs1') startSnake(data.roomId, soyAnfitrion);
+                else if (game === 'SPACE SHOOTER') startSpace(data.roomId, soyAnfitrion);
+            }, 300);
         });
 
-        socket.on('errorSala', (msg) => {
-            alert(msg);
-        });
+        socket.on('error_msg', (msg) => { alert(msg); });
     </script>
 </body>
 </html>
