@@ -1,22 +1,27 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <!-- Google tag (gtag.js) - Analytics Integration Corregida -->
-    <script async src="https://googletagmanager.com"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-5M67DCZBD6');
-    </script>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MINI 1vs1 | Arcade Online</title>
+    
     <link href="https://googleapis.com" rel="stylesheet">
     
+    <!-- 1. Librería Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
 
+    <script>
+        // 2. Creación del socket global
+        const socket = io(); 
+    </script>
+
+    <!-- 3. Scripts de Juegos -->
+    <script src="/js/pingpong.js?v=dexter_final"></script>
+    <script src="/js/carrera.js?v=dexter_final"></script>
+    <script src="/js/tetrix.js?v=dexter_final"></script>
+    <script src="/js/tiro.js?v=dexter_final"></script>
+    <script src="/js/laberinto.js?v=dexter_final"></script>
+    
     <style>
         :root { --neon-green: #39FF14; --neon-pink: #FF00FF; --bg-color: #0d0208; }
         
@@ -68,6 +73,7 @@
             background: #000; 
             transition: 0.2s; 
             font-size: 1rem; 
+            font-weight: bold;
             color: var(--neon-green);
             text-shadow: 2px 2px 0px #000;
         }
@@ -113,16 +119,19 @@
         }
 
         footer { position: fixed; bottom: 20px; right: 20px; z-index: 5000; }
-        .frutilla { font-size: 22px; filter: drop-shadow(0 0 5px red); cursor: pointer; user-select: none; }
+        .frutilla { font-size: 45px; filter: drop-shadow(0 0 10px red); cursor: pointer; user-select: none; }
 
+        /* --- ESTILOS DEL EASTER EGG (CARAS DE PABLO CORREGIDAS) --- */
         .pablo-head {
             position: fixed;
             width: 90px;
             height: 90px;
             border-radius: 50%;
             background-image: url('/pablo.jpg'); 
+            /* Ajuste de encuadre: bajamos el porcentaje para que no se vea solo la frente */
             background-size: cover;        
             background-position: center 25%; 
+            background-repeat: no-repeat;
             border: 3px solid var(--neon-pink);
             z-index: 9999;
             cursor: pointer;
@@ -137,9 +146,17 @@
             75% { transform: translate(120px, 60px); }
         }
 
-        @keyframes rotateSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes rotateSlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
 
-        .explode { transform: scale(4) !important; opacity: 0 !important; transition: all 0.4s ease-out; pointer-events: none; }
+        .explode {
+            transform: scale(4) !important;
+            opacity: 0 !important;
+            transition: all 0.4s ease-out;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -152,10 +169,8 @@
             <div class="game-card" onclick="openModal('PING PONG')">PING PONG</div>
             <div class="game-card" onclick="openModal('CARRERA 2D')">CARRERA 2D</div>
             <div class="game-card" onclick="openModal('TETRIX')">TETRIX</div>
-            <div class="game-card" onclick="openModal('TIRO AL BLANCO')">TIRO AL BLANCO</div>
-            <div class="game-card" onclick="openModal('LABERINTO NEÓN')">LABERINTO NEÓN</div>
-            <div class="game-card" onclick="openModal('SNAKE 1vs1')">SNAKE 1vs1</div>
-            <div class="game-card" onclick="openModal('SPACE SHOOTER')">SPACE SHOOTER</div>
+            <div class="game-card" onclick="openModal('TIRO')">TIRO AL BLANCO</div>
+            <div class="game-card" onclick="openModal('LABERINTO')">LABERINTO NEÓN</div>
         </div>
     </div>
 
@@ -173,16 +188,9 @@
         <p onclick="closeModal()" style="cursor:pointer; color: #ff4d4d; margin-top: 25px; font-family: 'Press Start 2P'; font-size: 0.8rem;">[ CANCELAR ]</p>
     </div>
 
-    <footer><div class="frutilla" onclick="handleStrawberryClick()">🍓</div></footer>
-
-    <script>const socket = io();</script>
-    <script src="/js/pingpong.js"></script>
-    <script src="/js/carrera.js"></script>
-    <script src="/js/tetrix.js"></script>
-    <script src="/js/tiro.js"></script>
-    <script src="/js/laberinto.js"></script>
-    <script src="/js/snake.js"></script>
-    <script src="/js/space.js"></script>
+    <footer>
+        <div class="frutilla" onclick="handleStrawberryClick()">🍓</div>
+    </footer>
 
     <script>
         let soyAnfitrion = false;
@@ -197,7 +205,10 @@
                 spawnPablos();
                 clicksFrutilla = 0;
             } else {
-                timerFrutilla = setTimeout(() => { clicksFrutilla = 0; alert('¡Gracias por jugar!'); }, 500);
+                timerFrutilla = setTimeout(() => { 
+                    clicksFrutilla = 0; 
+                    alert('¡Gracias por jugar con nuestra página!'); 
+                }, 500);
             }
         }
 
@@ -216,51 +227,50 @@
         }
 
         function openModal(gameName) {
-            document.getElementById('selected-game-title').innerText = gameName;
             document.getElementById('room-modal').style.display = 'block';
-            document.getElementById('room-info').innerText = '';
+            document.getElementById('selected-game-title').innerText = gameName;
+            document.getElementById('room-info').innerHTML = "";
         }
 
-        function closeModal() {
-            document.getElementById('room-modal').style.display = 'none';
-        }
+        function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
 
         function generateRoom() {
-            const game = document.getElementById('selected-game-title').innerText;
-            const roomId = Math.floor(1000 + Math.random() * 9000);
             const pass = document.getElementById('room-pass').value || "123";
-            idSalaActual = roomId;
             soyAnfitrion = true;
-            document.getElementById('room-info').innerText = `SALA: ${roomId} | PASS: ${pass}`;
-            socket.emit('crearSala', { roomId, pass, game });
+            socket.emit('create_room', { password: pass, game: document.getElementById('selected-game-title').innerText });
         }
 
         function joinRoom() {
-            const roomId = document.getElementById('room-id').value;
-            const pass = document.getElementById('room-pass').value;
-            if(!roomId) return alert("Pon el ID de la sala");
-            idSalaActual = roomId;
+            const id = document.getElementById('room-id').value;
+            const pass = document.getElementById('room-pass').value || "123";
             soyAnfitrion = false;
-            socket.emit('unirseSala', { roomId, pass });
+            socket.emit('join_room', { roomId: id.toString(), password: pass });
         }
 
-        socket.on('empezarJuego', (data) => {
-            document.getElementById('ui-layer').style.display = 'none';
-            document.getElementById('room-modal').style.display = 'none';
-            document.getElementById('game-container').style.display = 'block';
-            
-            if(data.game === 'PING PONG') startPingPong(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'CARRERA 2D') startCarrera(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'TETRIX') startTetrix(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'TIRO AL BLANCO') startTiro(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'LABERINTO NEÓN') startLaberinto(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'SNAKE 1vs1') startSnake(socket, idSalaActual, soyAnfitrion);
-            if(data.game === 'SPACE SHOOTER') startSpace(socket, idSalaActual, soyAnfitrion);
+        socket.on('room_created', (data) => {
+            idSalaActual = data.roomId;
+            document.getElementById('room-info').innerHTML = `SALA: ${data.roomId}<br>PASS: ${data.password}`;
         });
 
-        socket.on('errorSala', (msg) => {
-            alert(msg);
+        socket.on('player_joined', (data) => {
+            idSalaActual = data.roomId; 
+            closeModal();
+            iniciarJuego(data.game);
         });
+
+        socket.on('error_msg', (msg) => { alert(msg); });
+
+        function iniciarJuego(nombre) {
+            document.getElementById('ui-layer').style.display = "none";
+            document.getElementById('game-container').style.display = "block";
+            document.getElementById('game-container').innerHTML = ""; 
+
+            if(nombre === "CARRERA 2D") startRacing(idSalaActual, soyAnfitrion);
+            else if(nombre === "PING PONG") startPingPong(idSalaActual, soyAnfitrion);
+            else if(nombre === "TETRIX") startTetrix(idSalaActual, soyAnfitrion);
+            else if(nombre === "TIRO") startTiro(idSalaActual, soyAnfitrion);
+            else if(nombre === "LABERINTO") startLaberinto(idSalaActual, soyAnfitrion);
+        }
     </script>
 </body>
 </html>
