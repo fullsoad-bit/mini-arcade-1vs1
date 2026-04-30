@@ -62,26 +62,25 @@
         <p style="color:#fff">UNIRSE A PARTIDA</p>
         <input type="number" id="room-id" placeholder="ID SALA">
         <input type="text" id="room-pass" placeholder="PASS" value="123">
-        <button class="btn" id="btn-join" onclick="joinRoom()">UNIRSE</button>
+        <button class="btn" onclick="joinRoom()">UNIRSE</button>
         <p onclick="closeModal()" style="cursor:pointer; color: #ff4d4d; margin-top: 25px; font-family: 'Press Start 2P'; font-size: 0.8rem;">[ CANCELAR ]</p>
     </div>
 
     <footer><div class="frutilla" onclick="handleStrawberryClick()">🍓</div></footer>
 
-    <!-- Cargamos Socket.io desde la ruta del servidor -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // Configuración robusta para Render
         const socket = io({ 
             transports: ['websocket', 'polling'],
-            upgrade: true
+            reconnection: true,
+            reconnectionAttempts: 5
         });
 
-        socket.on('connect', () => { console.log("✅ Conectado al servidor con ID:", socket.id); });
-        socket.on('connect_error', (err) => { console.error("❌ Error de conexión:", err); });
+        socket.on('connect', () => { 
+            console.log("✅ Conectado al servidor con ID:", socket.id); 
+        });
     </script>
 
-    <!-- Scripts de juegos -->
     <script src="/js/pingpong.js"></script>
     <script src="/js/carrera.js"></script>
     <script src="/js/tetrix.js"></script>
@@ -129,7 +128,6 @@
             idSalaActual = roomId;
             soyAnfitrion = true;
             document.getElementById('room-info').innerText = `SALA: ${roomId} | PASS: ${pass}`;
-            console.log("Emitiendo crearSala:", { roomId, pass, game });
             socket.emit('crearSala', { roomId, pass, game });
         }
 
@@ -151,6 +149,7 @@
             document.getElementById('game-container').style.display = 'block';
             
             const g = data.game;
+            // Aseguramos que la PC y el móvil reciban el mismo juego
             if(g === 'PING PONG') startPingPong(socket, idSalaActual, soyAnfitrion);
             else if(g === 'CARRERA 2D') startCarrera(socket, idSalaActual, soyAnfitrion);
             else if(g === 'TETRIX') startTetrix(socket, idSalaActual, soyAnfitrion);
