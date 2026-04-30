@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <!-- Google tag (gtag.js) - Analytics Integration -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5M67DCZBD6"></script>
+    <script async src="https://googletagmanager.com"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -175,7 +175,10 @@
 
     <footer><div class="frutilla" onclick="handleStrawberryClick()">🍓</div></footer>
 
-    <script>const socket = io();</script>
+    <script>
+        // Configuración para Render: forzamos websocket para evitar microcortes
+        const socket = io({ transports: ['websocket', 'polling'] });
+    </script>
     <script src="/js/pingpong.js"></script>
     <script src="/js/carrera.js"></script>
     <script src="/js/tetrix.js"></script>
@@ -236,12 +239,14 @@
         }
 
         function joinRoom() {
-            const roomId = document.getElementById('room-id').value;
+            const roomIdVal = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
-            if(!roomId) return alert("Pon el ID de la sala");
-            idSalaActual = roomId;
+            if(!roomIdVal) return alert("Pon el ID de la sala");
+            
+            // Convertimos a número para asegurar la comparación en el servidor
+            idSalaActual = parseInt(roomIdVal);
             soyAnfitrion = false;
-            socket.emit('unirseSala', { roomId, pass });
+            socket.emit('unirseSala', { roomId: idSalaActual, pass });
         }
 
         socket.on('empezarJuego', (data) => {
