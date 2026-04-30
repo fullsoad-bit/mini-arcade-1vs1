@@ -70,14 +70,15 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // Configuración máxima para servidores gratuitos
         const socket = io({ 
             transports: ['websocket', 'polling'],
             reconnection: true,
-            reconnectionAttempts: 5
+            timeout: 20000
         });
 
         socket.on('connect', () => { 
-            console.log("✅ Conectado al servidor con ID:", socket.id); 
+            console.log("✅ Conectado con ID:", socket.id); 
         });
     </script>
 
@@ -136,20 +137,20 @@
             const pass = document.getElementById('room-pass').value;
             if(!roomIdVal) return alert("Pon el ID de la sala");
             
-            idSalaActual = parseInt(roomIdVal);
+            // Forzamos que sea número antes de enviar
+            idSalaActual = Number(roomIdVal);
             soyAnfitrion = false;
-            console.log("Intentando unirse a sala:", idSalaActual);
+            console.log("👉 Intentando enviar unirseSala para:", idSalaActual);
             socket.emit('unirseSala', { roomId: idSalaActual, pass: pass });
         }
 
         socket.on('empezarJuego', (data) => {
-            console.log("🚀 ¡SERVIDOR ORDENA EMPEZAR!", data.game);
+            console.log("🎮 ¡DATOS RECIBIDOS! Iniciando:", data.game);
             document.getElementById('ui-layer').style.display = 'none';
             document.getElementById('room-modal').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
             
             const g = data.game;
-            // Aseguramos que la PC y el móvil reciban el mismo juego
             if(g === 'PING PONG') startPingPong(socket, idSalaActual, soyAnfitrion);
             else if(g === 'CARRERA 2D') startCarrera(socket, idSalaActual, soyAnfitrion);
             else if(g === 'TETRIX') startTetrix(socket, idSalaActual, soyAnfitrion);
@@ -160,7 +161,7 @@
         });
 
         socket.on('errorSala', (msg) => {
-            console.error("❌ Error del servidor:", msg);
+            console.error("⛔ Error:", msg);
             alert(msg);
         });
     </script>
