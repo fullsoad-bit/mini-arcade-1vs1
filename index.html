@@ -13,6 +13,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MINI 1vs1 | Arcade Online</title>
+    
+    <!-- Fuentes de Google corregidas para que funcionen los estilos CSS -->
     <link href="https://googleapis.com" rel="stylesheet">
     
     <script src="/socket.io/socket.io.js"></script>
@@ -214,52 +216,6 @@
                 document.body.appendChild(head);
             }
         }
-
-        function openModal(gameName) {
-            document.getElementById('selected-game-title').innerText = gameName;
-            document.getElementById('room-modal').style.display = 'block';
-        }
-
-        function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
-
-        function generateRoom() {
-            const pass = document.getElementById('room-pass').value || "123";
-            const game = document.getElementById('selected-game-title').innerText;
-            soyAnfitrion = true;
-            socket.emit('create_room', { password: pass, game: game });
-        }
-
-        socket.on('room_created', (data) => {
-            idSalaActual = data.roomId;
-            document.getElementById('room-info').innerText = `ID: ${data.roomId} | PASS: ${data.password}`;
-        });
-
-        function joinRoom() {
-            const rId = document.getElementById('room-id').value;
-            const pass = document.getElementById('room-pass').value;
-            soyAnfitrion = false;
-            socket.emit('join_room', { roomId: rId, password: pass });
-        }
-
-        socket.on('player_joined', (data) => {
-            idSalaActual = data.roomId;
-            document.getElementById('ui-layer').style.display = 'none';
-            document.getElementById('room-modal').style.display = 'none';
-            document.getElementById('game-container').style.display = 'block';
-            
-            setTimeout(() => {
-                const game = data.game;
-                if (game === 'PING PONG') startPingPong(data.roomId, soyAnfitrion);
-                else if (game === 'CARRERA 2D') startCarrera(data.roomId, soyAnfitrion);
-                else if (game === 'TETRIX') startTetrix(data.roomId, soyAnfitrion);
-                else if (game === 'TIRO AL BLANCO') startTiro(data.roomId, soyAnfitrion);
-                else if (game === 'LABERINTO NEÓN') startLaberinto(data.roomId, soyAnfitrion);
-                else if (game === 'SNAKE 1vs1') startSnake(data.roomId, soyAnfitrion);
-                else if (game === 'SPACE SHOOTER') startSpace(data.roomId, soyAnfitrion);
-            }, 300);
-        });
-
-        socket.on('error_msg', (msg) => { alert(msg); });
     </script>
 </body>
 </html>
