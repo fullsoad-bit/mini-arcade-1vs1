@@ -5,7 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MINI 1vs1 | Arcade Online</title>
     
-    <!-- Prioridad absoluta: Socket.io -->
+    <!-- Google tag (gtag.js) - INYECTADO SIN BLOQUEO -->
+    <script async src="https://googletagmanager.com"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-5M67DCZBD6');
+    </script>
+
     <script src="/socket.io/socket.io.js"></script>
 
     <style>
@@ -61,7 +69,6 @@
 
     <footer><div class="frutilla" onclick="handleStrawberryClick()">🍓</div></footer>
 
-    <!-- Lógica de Sockets y Juegos -->
     <script>const socket = io();</script>
     <script src="/js/pingpong.js"></script>
     <script src="/js/carrera.js"></script>
@@ -101,7 +108,9 @@
             document.getElementById('room-info').innerText = '';
         }
 
-        function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
+        function closeModal() {
+            document.getElementById('room-modal').style.display = 'none';
+        }
 
         function generateRoom() {
             const game = document.getElementById('selected-game-title').innerText;
@@ -114,12 +123,12 @@
         }
 
         function joinRoom() {
-            const roomIdVal = document.getElementById('room-id').value;
+            const roomId = document.getElementById('room-id').value;
             const pass = document.getElementById('room-pass').value;
-            if(!roomIdVal) return alert("Pon el ID de la sala");
-            idSalaActual = parseInt(roomIdVal);
+            if(!roomId) return alert("Pon el ID de la sala");
+            idSalaActual = roomId;
             soyAnfitrion = false;
-            socket.emit('unirseSala', { roomId: idSalaActual, pass: pass });
+            socket.emit('unirseSala', { roomId, pass });
         }
 
         socket.on('empezarJuego', (data) => {
@@ -136,21 +145,8 @@
             if(data.game === 'SPACE SHOOTER') startSpace(socket, idSalaActual, soyAnfitrion);
         });
 
-        socket.on('errorSala', (msg) => { alert(msg); });
-
-        // ANALYTICS EN SEGUNDO PLANO (No bloquea el juego)
-        window.addEventListener('load', function() {
-            const scriptGA = document.createElement('script');
-            scriptGA.async = true;
-            scriptGA.src = "https://googletagmanager.com";
-            document.head.appendChild(scriptGA);
-
-            scriptGA.onload = function() {
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', 'G-5M67DCZBD6');
-            };
+        socket.on('errorSala', (msg) => {
+            alert(msg);
         });
     </script>
 </body>
