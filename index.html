@@ -7,40 +7,136 @@
     
     <link href="https://googleapis.com" rel="stylesheet">
     
-    <!-- 1. DEPENDENCIA CRÍTICA: Socket.io primero que todo -->
+    <!-- 1. Librería Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-        // 2. INICIALIZACIÓN INMEDIATA DEL OBJETO GLOBAL
-        // Esto garantiza que ningún script de juego falle por "socket is not defined"
+        // 2. Creación del socket global
         const socket = io(); 
     </script>
 
-    <!-- 3. CARGA DE LÓGICA DE JUEGOS -->
+    <!-- 3. Scripts de Juegos -->
     <script src="/js/pingpong.js?v=dexter_final"></script>
     <script src="/js/carrera.js?v=dexter_final"></script>
     <script src="/js/tetrix.js?v=dexter_final"></script>
     <script src="/js/tiro.js?v=dexter_final"></script>
     <script src="/js/laberinto.js?v=dexter_final"></script>
-    <script src="/js/snake.js?v=dexter_final"></script>
-    <script src="/js/space.js?v=dexter_final"></script>
     
     <style>
         :root { --neon-green: #39FF14; --neon-pink: #FF00FF; --bg-color: #0d0208; }
-        body { background-color: var(--bg-color); color: var(--neon-green); font-family: 'Roboto', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; touch-action: manipulation; overflow-x: hidden; }
+        
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--neon-green); 
+            font-family: 'Roboto', sans-serif; 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 100vh; 
+            touch-action: manipulation; 
+            overflow-x: hidden;
+        }
+
         #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; padding-bottom: 100px; }
         #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; }
-        h1 { font-family: 'Press Start 2P', cursive; font-size: 2.2rem; color: var(--neon-pink); margin-top: 50px; margin-bottom: 10px; text-shadow: 4px 4px 0px #000; text-align: center; }
-        .subtitle { font-family: 'Press Start 2P', cursive; font-size: 0.8rem; color: #fff; margin-bottom: 40px; background: rgba(0,0,0,0.7); padding: 8px 15px; border: 1px solid var(--neon-pink); border-radius: 5px; }
+
+        h1 { 
+            font-family: 'Press Start 2P', cursive; 
+            font-size: 2.2rem; 
+            color: var(--neon-pink); 
+            margin-top: 50px; 
+            margin-bottom: 10px; 
+            text-shadow: 4px 4px 0px #000; 
+            text-align: center; 
+        }
+        
+        .subtitle { 
+            font-family: 'Press Start 2P', cursive; 
+            font-size: 0.8rem; 
+            color: #fff; 
+            margin-bottom: 40px; 
+            background: rgba(0,0,0,0.7);
+            padding: 8px 15px;
+            border: 1px solid var(--neon-pink);
+            border-radius: 5px;
+        }
+
         .game-grid { display: grid; grid-template-columns: 1fr; gap: 20px; width: 90%; max-width: 500px; }
-        .game-card { font-family: 'Press Start 2P', cursive; border: 4px solid var(--neon-green); padding: 25px 10px; text-align: center; cursor: pointer; background: #000; transition: 0.2s; font-size: 1rem; font-weight: bold; color: var(--neon-green); text-shadow: 2px 2px 0px #000; }
+        
+        .game-card { 
+            font-family: 'Press Start 2P', cursive; 
+            border: 4px solid var(--neon-green); 
+            padding: 25px 10px; 
+            text-align: center; 
+            cursor: pointer; 
+            background: #000; 
+            transition: 0.2s; 
+            font-size: 1rem; 
+            font-weight: bold;
+            color: var(--neon-green);
+            text-shadow: 2px 2px 0px #000;
+        }
+
         .game-card:hover { background-color: var(--neon-green); color: black; text-shadow: none; }
-        #room-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 5px solid var(--neon-pink); padding: 30px; z-index: 2000; width: 90%; max-width: 400px; text-align: center; }
-        input { background: #111; border: 3px solid var(--neon-green); color: #fff; padding: 15px; margin: 10px 0; width: 85%; text-align: center; font-size: 1.5rem; font-weight: bold; }
-        .btn { background: var(--neon-pink); color: white; border: none; padding: 20px; font-family: 'Press Start 2P', cursive; cursor: pointer; font-size: 1rem; width: 100%; margin-top: 15px; }
+
+        #room-modal { 
+            display: none; 
+            position: fixed; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            background: #000; 
+            border: 5px solid var(--neon-pink); 
+            padding: 30px; 
+            z-index: 2000; 
+            width: 90%; 
+            max-width: 400px; 
+            text-align: center;
+        }
+        
+        input { 
+            background: #111; 
+            border: 3px solid var(--neon-green); 
+            color: #fff; 
+            padding: 15px; 
+            margin: 10px 0; 
+            width: 85%; 
+            text-align: center; 
+            font-size: 1.5rem; 
+            font-weight: bold;
+        }
+        
+        .btn { 
+            background: var(--neon-pink); 
+            color: white; 
+            border: none; 
+            padding: 20px; 
+            font-family: 'Press Start 2P', cursive; 
+            cursor: pointer; 
+            font-size: 1rem; 
+            width: 100%; 
+            margin-top: 15px; 
+        }
+
         footer { position: fixed; bottom: 20px; right: 20px; z-index: 5000; }
         .frutilla { font-size: 45px; filter: drop-shadow(0 0 10px red); cursor: pointer; user-select: none; }
-        .pablo-head { position: fixed; width: 90px; height: 90px; border-radius: 50%; background-image: url('/pablo.jpg'); background-size: cover; background-position: center 25%; background-repeat: no-repeat; border: 3px solid var(--neon-pink); z-index: 9999; cursor: pointer; box-shadow: 0 0 20px var(--neon-pink); animation: floatMove 8s infinite ease-in-out, rotateSlow 6s infinite linear; }
+
+        .pablo-head {
+            position: fixed;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background-image: url('/pablo.jpg'); 
+            background-size: cover;        
+            background-position: center 25%; 
+            background-repeat: no-repeat;
+            border: 3px solid var(--neon-pink);
+            z-index: 9999;
+            cursor: pointer;
+            box-shadow: 0 0 20px var(--neon-pink);
+            animation: floatMove 8s infinite ease-in-out, rotateSlow 6s infinite linear;
+        }
+
         @keyframes floatMove { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(60px, 120px); } 50% { transform: translate(-60px, 240px); } 75% { transform: translate(120px, 60px); } }
         @keyframes rotateSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .explode { transform: scale(4) !important; opacity: 0 !important; transition: all 0.4s ease-out; pointer-events: none; }
@@ -51,6 +147,7 @@
     <div id="ui-layer">
         <h1>MINI 1vs1</h1>
         <div class="subtitle">de Dexter servicio técnico</div>
+
         <div class="game-grid">
             <div class="game-card" onclick="openModal('PING PONG')">PING PONG</div>
             <div class="game-card" onclick="openModal('CARRERA 2D')">CARRERA 2D</div>
@@ -77,7 +174,6 @@
     <footer><div class="frutilla" onclick="handleStrawberryClick()">🍓</div></footer>
 
     <script>
-        // --- LOGICA DE UI Y SALAS ORIGINAL (RESTAURADA) ---
         let soyAnfitrion = false;
         let idSalaActual = null;
         let clicksFrutilla = 0;
@@ -140,25 +236,15 @@
         });
 
         socket.on('errorSala', (msg) => { alert(msg); });
+    </script>
 
-        // --- INTEGRACIÓN DE ANALYTICS NO BLOQUEANTE (CAPA DE AISLAMIENTO) ---
-        // Se ejecuta solo cuando el navegador esté libre de tareas pesadas
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                const gaScript = document.createElement('script');
-                gaScript.async = true;
-                gaScript.src = "https://googletagmanager.com";
-                document.head.appendChild(gaScript);
-
-                gaScript.onload = () => {
-                    window.dataLayer = window.dataLayer || [];
-                    function gtag(){dataLayer.push(arguments);}
-                    gtag('js', new Date());
-                    gtag('config', 'G-5M67DCZBD6', { 'connect_timeout': 2000 });
-                    console.log("Analytics cargado sin interferir con el Socket.");
-                };
-            }, 3000); // Retraso intencional de 3 segundos para dar prioridad al juego
-        });
+    <!-- GOOGLE ANALYTICS AL FINAL (Para no interferir con el Socket) -->
+    <script async src="https://googletagmanager.com"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-5M67DCZBD6');
     </script>
 </body>
 </html>
