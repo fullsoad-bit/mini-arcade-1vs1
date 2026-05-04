@@ -15,14 +15,6 @@
         const socket = io(); 
     </script>
 
-    <!-- 3. Scripts de Juegos -->
-    <script src="/js/pingpong.js?v=dexter_final"></script>
-    <script src="/js/carrera.js?v=dexter_final"></script>
-    <script src="/js/tetrix.js?v=dexter_final"></script>
-    <script src="/js/tiro.js?v=dexter_final"></script>
-    <script src="/js/laberinto.js?v=dexter_final"></script>
-    <script src="/js/snake.js?v=dexter_final"></script>
-    <script src="/js/space.js?v=dexter_final"></script>
     <style>
         :root { --neon-green: #39FF14; --neon-pink: #FF00FF; --bg-color: #0d0208; }
         
@@ -194,6 +186,7 @@
         <div class="frutilla" onclick="handleStrawberryClick()">🍓</div>
     </footer>
 
+    <!-- Lógica de control y modals -->
     <script>
         let soyAnfitrion = false;
         let idSalaActual = null;
@@ -229,7 +222,6 @@
             }
         }
 
-        // --- SISTEMA DE MODAL AGREGADO ---
         function openModal(gameName) {
             juegoSeleccionado = gameName;
             document.getElementById('selected-game-title').innerText = gameName;
@@ -247,7 +239,6 @@
             soyAnfitrion = true;
             document.getElementById('room-info').innerText = `SALA: ${randomId} | PASS: 123`;
             
-            // Simulación de creación de sala mediante socket
             socket.emit('crearSala', { id: randomId, juego: juegoSeleccionado });
         }
 
@@ -258,7 +249,6 @@
             if(!idInput) return alert("Ingresa el ID de la sala");
             
             soyAnfitrion = false;
-            // Simulación de unión a sala mediante socket
             socket.emit('unirseSala', { id: idInput, pass: passInput, juego: juegoSeleccionado });
             
             closeModal();
@@ -266,5 +256,14 @@
             document.getElementById('game-container').style.display = 'block';
         }
     </script>
+
+    <!-- 3. Los scripts de los juegos se cargan AL FINAL para que el HTML ya exista -->
+    <script src="/js/pingpong.js?v=dexter_final"></script>
+    <script src="/js/carrera.js?v=dexter_final"></script>
+    <script src="/js/tetrix.js?v=dexter_final"></script>
+    <script src="/js/tiro.js?v=dexter_final"></script>
+    <script src="/js/laberinto.js?v=dexter_final"></script>
+    <script src="/js/snake.js?v=dexter_final"></script>
+    <script src="/js/space.js?v=dexter_final"></script>
 </body>
 </html>
