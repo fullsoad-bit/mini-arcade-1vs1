@@ -129,7 +129,6 @@
             height: 90px;
             border-radius: 50%;
             background-image: url('/pablo.jpg'); 
-            /* Ajuste de encuadre: bajamos el porcentaje para que no se vea solo la frente */
             background-size: cover;        
             background-position: center 25%; 
             background-repeat: no-repeat;
@@ -200,6 +199,7 @@
         let idSalaActual = null;
         let clicksFrutilla = 0;
         let timerFrutilla;
+        let juegoSeleccionado = '';
 
         function handleStrawberryClick() {
             clicksFrutilla++;
@@ -222,59 +222,48 @@
                 head.style.left = Math.random() * 70 + 'vw';
                 head.style.top = Math.random() * 70 + 'vh';
                 head.onclick = function() {
-                    this.classList.add('explode');
-                    setTimeout(() => { this.remove(); }, 400);
+                    head.classList.add('explode');
+                    setTimeout(() => head.remove(), 400);
                 };
                 document.body.appendChild(head);
             }
         }
 
+        // --- SISTEMA DE MODAL AGREGADO ---
         function openModal(gameName) {
-            document.getElementById('room-modal').style.display = 'block';
+            juegoSeleccionado = gameName;
             document.getElementById('selected-game-title').innerText = gameName;
-            document.getElementById('room-info').innerHTML = "";
+            document.getElementById('room-modal').style.display = 'block';
+            document.getElementById('room-info').innerText = '';
         }
 
-        function closeModal() { document.getElementById('room-modal').style.display = 'none'; }
+        function closeModal() {
+            document.getElementById('room-modal').style.display = 'none';
+        }
 
         function generateRoom() {
-            const pass = document.getElementById('room-pass').value || "123";
+            const randomId = Math.floor(1000 + Math.random() * 9000);
+            idSalaActual = randomId;
             soyAnfitrion = true;
-            socket.emit('create_room', { password: pass, game: document.getElementById('selected-game-title').innerText });
+            document.getElementById('room-info').innerText = `SALA: ${randomId} | PASS: 123`;
+            
+            // Simulación de creación de sala mediante socket
+            socket.emit('crearSala', { id: randomId, juego: juegoSeleccionado });
         }
 
         function joinRoom() {
-            const id = document.getElementById('room-id').value;
-            const pass = document.getElementById('room-pass').value || "123";
+            const idInput = document.getElementById('room-id').value;
+            const passInput = document.getElementById('room-pass').value;
+            
+            if(!idInput) return alert("Ingresa el ID de la sala");
+            
             soyAnfitrion = false;
-            socket.emit('join_room', { roomId: id.toString(), password: pass });
-        }
-
-        socket.on('room_created', (data) => {
-            idSalaActual = data.roomId;
-            document.getElementById('room-info').innerHTML = `SALA: ${data.roomId}<br>PASS: ${data.password}`;
-        });
-
-        socket.on('player_joined', (data) => {
-            idSalaActual = data.roomId; 
+            // Simulación de unión a sala mediante socket
+            socket.emit('unirseSala', { id: idInput, pass: passInput, juego: juegoSeleccionado });
+            
             closeModal();
-            iniciarJuego(data.game);
-        });
-
-        socket.on('error_msg', (msg) => { alert(msg); });
-
-        function iniciarJuego(nombre) {
-            document.getElementById('ui-layer').style.display = "none";
-            document.getElementById('game-container').style.display = "block";
-            document.getElementById('game-container').innerHTML = ""; 
-
-            if(nombre === "CARRERA 2D") startRacing(idSalaActual, soyAnfitrion);
-            else if(nombre === "PING PONG") startPingPong(idSalaActual, soyAnfitrion);
-            else if(nombre === "TETRIX") startTetrix(idSalaActual, soyAnfitrion);
-            else if(nombre === "TIRO") startTiro(idSalaActual, soyAnfitrion);
-            else if(nombre === "LABERINTO") startLaberinto(idSalaActual, soyAnfitrion);
-            else if(nombre === "Spece") startTiro(idSalaActual, soyAnfitrion);
-            else if(nombre === "Snake") startTiro(idSalaActual, soyAnfitrion);
+            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
         }
     </script>
 </body>
