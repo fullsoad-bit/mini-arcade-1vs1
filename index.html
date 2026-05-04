@@ -15,6 +15,15 @@
         const socket = io(); 
     </script>
 
+    <!-- 3. Scripts de Juegos -->
+    <script src="/js/pingpong.js?v=dexter_final"></script>
+    <script src="/js/carrera.js?v=dexter_final"></script>
+    <script src="/js/tetrix.js?v=dexter_final"></script>
+    <script src="/js/tiro.js?v=dexter_final"></script>
+    <script src="/js/laberinto.js?v=dexter_final"></script>
+    <script src="/js/snake.js?v=dexter_final"></script>
+    <script src="/js/space.js?v=dexter_final"></script>
+    
     <style>
         :root { --neon-green: #39FF14; --neon-pink: #FF00FF; --bg-color: #0d0208; }
         
@@ -32,10 +41,7 @@
         }
 
         #ui-layer { width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; padding-bottom: 100px; }
-        #game-container { display: none; width: 100%; text-align: center; margin-top: 20px; }
-        
-        /* Asegura que el canvas del juego se vea bien */
-        canvas { border: 4px solid var(--neon-pink); background: #000; box-shadow: 0 0 20px var(--neon-pink); }
+        #game-container { display: none; width: 100%; text-align: center; margin-top: 10px; }
 
         h1 { 
             font-family: 'Press Start 2P', cursive; 
@@ -117,6 +123,7 @@
         footer { position: fixed; bottom: 20px; right: 20px; z-index: 5000; }
         .frutilla { font-size: 45px; filter: drop-shadow(0 0 10px red); cursor: pointer; user-select: none; }
 
+        /* --- ESTILOS DEL EASTER EGG (CARAS DE PABLO CORREGIDAS) --- */
         .pablo-head {
             position: fixed;
             width: 90px;
@@ -160,17 +167,16 @@
         <div class="subtitle">de Dexter servicio técnico</div>
 
         <div class="game-grid">
-            <div class="game-card" onclick="openModal('PING PONG', 'pingpong')">PING PONG</div>
-            <div class="game-card" onclick="openModal('CARRERA 2D', 'carrera')">CARRERA 2D</div>
-            <div class="game-card" onclick="openModal('TETRIX', 'tetrix')">TETRIX</div>
-            <div class="game-card" onclick="openModal('TIRO', 'tiro')">TIRO AL BLANCO</div>
-            <div class="game-card" onclick="openModal('LABERINTO', 'laberinto')">LABERINTO NEÓN</div>
-            <div class="game-card" onclick="openModal('SNAKE', 'snake')">SNAKE</div>
-            <div class="game-card" onclick="openModal('SPACE', 'space')">SPACE</div>
+            <div class="game-card" onclick="openModal('PING PONG')">PING PONG</div>
+            <div class="game-card" onclick="openModal('CARRERA 2D')">CARRERA 2D</div>
+            <div class="game-card" onclick="openModal('TETRIX')">TETRIX</div>
+            <div class="game-card" onclick="openModal('TIRO')">TIRO AL BLANCO</div>
+            <div class="game-card" onclick="openModal('LABERINTO')">LABERINTO NEÓN</div>
+            <div class="game-card" onclick="openModal('SNAKE')">SNAKE</div>
+            <div class="game-card" onclick="openModal('SPACE')">SPACE</div>
         </div>
     </div>
 
-    <!-- El contenedor del juego ahora está limpio y listo para recibir el canvas -->
     <div id="game-container"></div>
 
     <div id="room-modal">
@@ -194,83 +200,8 @@
         let idSalaActual = null;
         let clicksFrutilla = 0;
         let timerFrutilla;
-        let juegoSeleccionado = ''; 
-        let archivoJuego = ''; 
+        let juegoSeleccionado = '';
 
-        // --- SISTEMA DE MODAL Y ASIGNACIÓN ---
-        function openModal(gameName, fileName) {
-            juegoSeleccionado = gameName;
-            archivoJuego = fileName; 
-            document.getElementById('selected-game-title').innerText = gameName;
-            document.getElementById('room-modal').style.display = 'block';
-            document.getElementById('room-info').innerText = '';
-        }
-
-        function closeModal() {
-            document.getElementById('room-modal').style.display = 'none';
-        }
-
-        // --- INTERACCIÓN CON EL SERVER.JS ---
-        function generateRoom() {
-            const passInput = document.getElementById('room-pass').value || "123";
-            soyAnfitrion = true;
-            
-            // Envío correcto según tu server.js
-            socket.emit('create_room', { password: passInput, game: archivoJuego });
-        }
-
-        function joinRoom() {
-            const idInput = document.getElementById('room-id').value;
-            const passInput = document.getElementById('room-pass').value;
-            
-            if(!idInput) return alert("Ingresa el ID de la sala");
-            
-            soyAnfitrion = false;
-            // Envío correcto según tu server.js
-            socket.emit('join_room', { roomId: idInput, password: passInput });
-        }
-
-        // --- RESPUESTAS DEL SERVIDOR ---
-        socket.on('room_created', (data) => {
-            idSalaActual = data.roomId;
-            document.getElementById('room-info').innerText = `SALA: ${data.roomId} | PASS: ${data.password}`;
-            // En salas creadas, esperamos al segundo jugador para arrancar
-        });
-
-        socket.on('player_joined', (data) => {
-            idSalaActual = data.roomId;
-            alert("¡Jugador conectado! Iniciando juego...");
-            closeModal();
-            iniciarJuegoDinamico(data.game);
-        });
-
-        socket.on('error_msg', (msg) => {
-            alert(msg);
-        });
-
-        // --- CARGA DINÁMICA DE JUEGOS ---
-        function iniciarJuegoDinamico(nombreArchivo) {
-            document.getElementById('ui-layer').style.display = 'none';
-            const container = document.getElementById('game-container');
-            container.style.display = 'block';
-            
-            // 1. Limpiamos por si había algo antes
-            container.innerHTML = ''; 
-            
-            // 2. Creamos el canvas de manera forzada para los juegos
-            const canvas = document.createElement('canvas');
-            canvas.id = 'gameCanvas';
-            canvas.width = 400; // Medidas estándar de arcade
-            canvas.height = 400;
-            container.appendChild(canvas);
-            
-            // 3. Inyectamos solo el script del juego elegido
-            const script = document.createElement('script');
-            script.src = `/js/${nombreArchivo}.js?v=dexter_final`;
-            document.body.appendChild(script);
-        }
-
-        // --- EASTER EGG ---
         function handleStrawberryClick() {
             clicksFrutilla++;
             clearTimeout(timerFrutilla);
@@ -292,12 +223,48 @@
                 head.style.left = Math.random() * 70 + 'vw';
                 head.style.top = Math.random() * 70 + 'vh';
                 head.onclick = function() {
-                    head.classList.add('explode');
-                    setTimeout(() => head.remove(), 400);
+                    this.classList.add('explode');
+                    setTimeout(() => { this.remove(); }, 400);
                 };
                 document.body.appendChild(head);
             }
         }
+
+        function openModal(gameName) {
+            juegoSeleccionado = gameName;
+            document.getElementById('selected-game-title').innerText = gameName;
+            document.getElementById('room-modal').style.display = 'block';
+            document.getElementById('room-info').innerText = '';
+        }
+
+        function closeModal() {
+            document.getElementById('room-modal').style.display = 'none';
+        }
+
+        function generateRoom() {
+            const passInput = document.getElementById('room-pass').value || "123";
+            socket.emit('create_room', { password: passInput, game: juegoSeleccionado });
+        }
+
+        function joinRoom() {
+            const idInput = document.getElementById('room-id').value;
+            const passInput = document.getElementById('room-pass').value;
+            if(!idInput) return alert("Ingresa el ID de la sala");
+            socket.emit('join_room', { roomId: idInput, password: passInput });
+        }
+
+        socket.on('room_created', (data) => {
+            idSalaActual = data.roomId;
+            document.getElementById('room-info').innerText = `SALA: ${data.roomId} | PASS: ${data.password}`;
+        });
+
+        socket.on('player_joined', (data) => {
+            closeModal();
+            document.getElementById('ui-layer').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+        });
+
+        socket.on('error_msg', (msg) => { alert(msg); });
     </script>
 </body>
 </html>
